@@ -1,0 +1,138 @@
+﻿<div class="page-shell">
+  <header class="topbar">
+    <div class="brand">Tienda Web</div>
+    <div class="topbar-actions">
+      <a class="cart-link" href="#cart" aria-label="Ir al carrito">
+        Carrito <span class="cart-count">{{ cartCount() }}</span>
+      </a>
+      <span class="status">API activa</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="shopping-layout">
+      <section class="products-panel">
+        @if (isLoading()) {
+          <div class="state-card loading">Cargando productos...</div>
+        } @else if (error()) {
+          <div class="state-card error">{{ error() }}</div>
+        } @else if (products().length === 0) {
+          <div class="state-card">No hay productos disponibles.</div>
+        } @else {
+          <div class="product-grid">
+            @for (product of products(); track product.id) {
+              <article class="product-card">
+                <div class="product-header">
+                  <h2>{{ product.name }}</h2>
+                  <span class="badge">Disponible</span>
+                </div>
+
+                <p class="description">
+                  {{ product.description || 'Sin descripcion adicional.' }}
+                </p>
+
+                <div class="price">{{ product.price_cents / 100 | currency: 'USD' }}</div>
+
+                @if (product.variants.length) {
+                  <div class="variants">
+                    <h3>Opciones</h3>
+                    <ul>
+                      @for (variant of product.variants; track variant.id) {
+                        <li class="variant-option">
+                          <div>
+                            <span>{{ variant.color || 'General' }} / {{ variant.size || 'Talla unica' }}</span>
+                            <span class="variant-price">
+                              {{ (product.price_cents + variant.price_adjustment_cents) / 100 | currency: 'USD' }}
+                            </span>
+                          </div>
+                          <button type="button" class="add-button" (click)="addToCart(product, variant)">
+                            Añadir
+                          </button>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                } @else {
+                  <button type="button" class="add-button" (click)="addToCart(product)">
+                    Añadir al carrito
+                  </button>
+                }
+              </article>
+            }
+          </div>
+        }
+      </section>
+
+      <aside class="cart-panel" id="cart" aria-labelledby="cart-title">
+        <div class="cart-heading">
+          <div>
+            <p class="cart-eyebrow">Tu selección</p>
+            <h2 id="cart-title">Carrito</h2>
+          </div>
+          <span class="cart-count">{{ cartCount() }}</span>
+        </div>
+
+        @if (cart().length === 0) {
+          <p class="empty-cart">Aún no has añadido productos.</p>
+        } @else {
+          <ul class="cart-list">
+            @for (item of cart(); track cartItemKey(item)) {
+              <li class="cart-item">
+                <div class="cart-item-heading">
+                  <div class="cart-item-name">
+                    <strong>{{ item.product.name }}</strong>
+                    @if (item.variant) {
+                      <span>{{ variantLabel(item.variant) }}</span>
+                    }
+                  </div>
+                  <button type="button" class="remove-button" (click)="removeFromCart(item)">
+                    Quitar
+                  </button>
+                </div>
+
+                <div class="cart-item-footer">
+                  <div class="quantity-control" aria-label="Cantidad">
+                    <button
+                      type="button"
+                      aria-label="Restar una unidad"
+                      (click)="decreaseQuantity(item)"
+                    >
+                      -
+                    </button>
+                    <span>{{ item.quantity }}</span>
+                    <button
+                      type="button"
+                      aria-label="Añadir una unidad"
+                      (click)="increaseQuantity(item)"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <strong>{{ (unitPriceCents(item) * item.quantity) / 100 | currency: 'USD' }}</strong>
+                </div>
+              </li>
+            }
+          </ul>
+
+          <div class="cart-total">
+            <span>Subtotal</span>
+            <strong>{{ cartSubtotalCents() / 100 | currency: 'USD' }}</strong>
+          </div>
+
+          <button
+            type="button"
+            class="whatsapp-button"
+            [disabled]="!canSendOrder()"
+            (click)="sendOrderToWhatsApp()"
+          >
+            Enviar pedido por WhatsApp
+          </button>
+          @if (!canSendOrder()) {
+            <p class="configuration-note">WhatsApp pendiente de configurar.</p>
+          }
+          <button type="button" class="clear-cart" (click)="clearCart()">Vaciar carrito</button>
+        }
+      </aside>
+    </div>
+  </main>
+</div>

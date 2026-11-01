@@ -1,0 +1,15 @@
+# Python environments and generated files
+.venv*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local configuration and databases
+.env
+*.db
+*.sqlite
+*.sqlite3
+
+# Workspace-specific editor settings
+.vscode/
