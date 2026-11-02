@@ -14,6 +14,16 @@ import { STORE_CONFIG } from './store-config';
 export class App implements OnInit {
   private readonly productService = inject(ProductService);
   private readonly whatsappPhone = STORE_CONFIG.whatsappPhone.replace(/\D/g, '');
+  private readonly productImages: Record<string, string> = {
+    'top-corse-encaje-negro':
+      'https://images.pexels.com/photos/33114806/pexels-photo-33114806.jpeg?auto=compress&cs=tinysrgb&w=900',
+    'top-corse-encaje-vino':
+      'https://images.pexels.com/photos/29474759/pexels-photo-29474759.jpeg?auto=compress&cs=tinysrgb&w=900',
+    'conjunto-floral-encaje-negro':
+      'https://images.unsplash.com/photo-1652859921634-d30457cb9695?auto=format&fit=crop&w=1200&q=85',
+    'conjunto-floral-encaje-vino':
+      'https://images.pexels.com/photos/838787/pexels-photo-838787.jpeg?auto=compress&cs=tinysrgb&w=900',
+  };
 
   protected readonly products = signal<Product[]>([]);
   protected readonly cart = signal<CartItem[]>([]);
@@ -49,6 +59,13 @@ export class App implements OnInit {
         this.error.set('No se pudieron cargar los productos en este momento.');
       },
     });
+  }
+
+  protected productImage(product: Product): string {
+    return (
+      this.productImages[product.slug] ??
+      'https://images.pexels.com/photos/33114806/pexels-photo-33114806.jpeg?auto=compress&cs=tinysrgb&w=900'
+    );
   }
 
   protected addToCart(product: Product, variant: ProductVariant | null = null): void {

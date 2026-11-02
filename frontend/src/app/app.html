@@ -1,138 +1,182 @@
 ﻿<div class="page-shell">
   <header class="topbar">
-    <div class="brand">Tienda Web</div>
-    <div class="topbar-actions">
-      <a class="cart-link" href="#cart" aria-label="Ir al carrito">
-        Carrito <span class="cart-count">{{ cartCount() }}</span>
+    <a class="brand" href="#top" aria-label="Tienda Web, inicio">
+      TIENDA <span>WEB</span>
+    </a>
+    <nav class="topbar-actions" aria-label="Navegación principal">
+      <a class="nav-link" href="#catalog">Catálogo</a>
+      <a class="cart-link" href="#cart" aria-label="Ir a tu pedido">
+        Tu pedido <span class="cart-count">{{ cartCount() }}</span>
       </a>
-      <span class="status">API activa</span>
-    </div>
+    </nav>
   </header>
 
-  <main class="content">
-    <div class="shopping-layout">
-      <section class="products-panel">
-        @if (isLoading()) {
-          <div class="state-card loading">Cargando productos...</div>
-        } @else if (error()) {
-          <div class="state-card error">{{ error() }}</div>
-        } @else if (products().length === 0) {
-          <div class="state-card">No hay productos disponibles.</div>
-        } @else {
-          <div class="product-grid">
-            @for (product of products(); track product.id) {
-              <article class="product-card">
-                <div class="product-header">
-                  <h2>{{ product.name }}</h2>
-                  <span class="badge">Disponible</span>
-                </div>
+  <main class="content" id="top">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Lencería de encaje</p>
+        <h1 id="hero-title">Intimidad,<br /><em>bien elegida.</em></h1>
+        <p class="subtitle">
+          Diseños delicados en tonos clásicos, con tallas para encontrar tu estilo.
+        </p>
+        <a class="hero-link" href="#catalog">
+          Descubrir la selección <span aria-hidden="true">↓</span>
+        </a>
+      </div>
 
-                <p class="description">
-                  {{ product.description || 'Sin descripcion adicional.' }}
-                </p>
+      <figure class="hero-visual">
+        <img
+          src="https://images.pexels.com/photos/33114806/pexels-photo-33114806.jpeg?auto=compress&cs=tinysrgb&w=1600"
+          alt="Top corsé negro de encaje"
+          width="1600"
+          height="1100"
+          fetchpriority="high"
+        />
+        <figcaption class="hero-caption">
+          <span>En foco</span>
+          <strong>Top corsé de encaje</strong>
+          <span>01 / {{ totalProducts() }}</span>
+        </figcaption>
+      </figure>
 
-                <div class="price">{{ product.price_cents / 100 | currency: 'USD' }}</div>
+      <div class="hero-footnote">
+        <span>Tallas S, M y L</span>
+        <span>{{ totalProducts() }} diseños disponibles</span>
+      </div>
+    </section>
 
-                @if (product.variants.length) {
-                  <div class="variants">
-                    <h3>Opciones</h3>
-                    <ul>
-                      @for (variant of product.variants; track variant.id) {
-                        <li class="variant-option">
-                          <div>
-                            <span>{{ variant.color || 'General' }} / {{ variant.size || 'Talla unica' }}</span>
-                            <span class="variant-price">
-                              {{ (product.price_cents + variant.price_adjustment_cents) / 100 | currency: 'USD' }}
-                            </span>
-                          </div>
-                          <button type="button" class="add-button" (click)="addToCart(product, variant)">
-                            Añadir
-                          </button>
-                        </li>
-                      }
-                    </ul>
-                  </div>
-                } @else {
-                  <button type="button" class="add-button" (click)="addToCart(product)">
-                    Añadir al carrito
-                  </button>
-                }
-              </article>
-            }
-          </div>
-        }
-      </section>
-
-      <aside class="cart-panel" id="cart" aria-labelledby="cart-title">
-        <div class="cart-heading">
-          <div>
-            <p class="cart-eyebrow">Tu selección</p>
-            <h2 id="cart-title">Carrito</h2>
-          </div>
-          <span class="cart-count">{{ cartCount() }}</span>
+    <section class="collection" id="catalog" aria-labelledby="collection-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Selección actual</p>
+          <h2 id="collection-title">Encaje, color y comodidad.</h2>
         </div>
+        <a class="section-link" href="#cart">Ver pedido <span aria-hidden="true">↗</span></a>
+      </div>
 
-        @if (cart().length === 0) {
-          <p class="empty-cart">Aún no has añadido productos.</p>
-        } @else {
-          <ul class="cart-list">
-            @for (item of cart(); track cartItemKey(item)) {
-              <li class="cart-item">
-                <div class="cart-item-heading">
-                  <div class="cart-item-name">
-                    <strong>{{ item.product.name }}</strong>
-                    @if (item.variant) {
-                      <span>{{ variantLabel(item.variant) }}</span>
-                    }
+      <div class="shopping-layout">
+        <section class="products-panel" aria-label="Productos disponibles">
+          @if (isLoading()) {
+            <div class="state-card loading">Cargando productos...</div>
+          } @else if (error()) {
+            <div class="state-card error">{{ error() }}</div>
+          } @else if (products().length === 0) {
+            <div class="state-card">No hay productos disponibles.</div>
+          } @else {
+            <div class="product-grid">
+              @for (product of products(); track product.id) {
+                <article class="product-card">
+                  <figure class="product-visual">
+                    <img [src]="productImage(product)" [alt]="product.name" loading="lazy" />
+                    <span class="badge">Disponible</span>
+                  </figure>
+
+                  <div class="product-content">
+                    <div class="product-title-row">
+                      <h3>{{ product.name }}</h3>
+                      <strong class="price">{{ product.price_cents / 100 | currency: 'USD' }}</strong>
+                    </div>
+                    <p class="description">
+                      {{ product.description || 'Un esencial elegido para acompañarte cada día.' }}
+                    </p>
                   </div>
-                  <button type="button" class="remove-button" (click)="removeFromCart(item)">
-                    Quitar
-                  </button>
-                </div>
 
-                <div class="cart-item-footer">
-                  <div class="quantity-control" aria-label="Cantidad">
-                    <button
-                      type="button"
-                      aria-label="Restar una unidad"
-                      (click)="decreaseQuantity(item)"
-                    >
-                      -
+                  @if (product.variants.length) {
+                    <div class="variants">
+                      <p class="option-label">Tallas disponibles</p>
+                      <ul>
+                        @for (variant of product.variants; track variant.id) {
+                          <li class="variant-option">
+                            <span>{{ variant.size || 'Talla única' }}</span>
+                            <strong class="variant-price">
+                              {{ (product.price_cents + variant.price_adjustment_cents) / 100 | currency: 'USD' }}
+                            </strong>
+                            <button
+                              type="button"
+                              class="add-button"
+                              [attr.aria-label]="'Añadir ' + product.name + ', talla ' + variant.size"
+                              (click)="addToCart(product, variant)"
+                            >
+                              <span aria-hidden="true">+</span>
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  } @else {
+                    <button type="button" class="add-button add-product" (click)="addToCart(product)">
+                      Añadir al pedido <span aria-hidden="true">+</span>
                     </button>
-                    <span>{{ item.quantity }}</span>
-                    <button
-                      type="button"
-                      aria-label="Añadir una unidad"
-                      (click)="increaseQuantity(item)"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <strong>{{ (unitPriceCents(item) * item.quantity) / 100 | currency: 'USD' }}</strong>
-                </div>
-              </li>
-            }
-          </ul>
+                  }
+                </article>
+              }
+            </div>
+          }
+        </section>
 
-          <div class="cart-total">
-            <span>Subtotal</span>
-            <strong>{{ cartSubtotalCents() / 100 | currency: 'USD' }}</strong>
+        <aside class="cart-panel" id="cart" aria-labelledby="cart-title">
+          <div class="cart-heading">
+            <div>
+              <p class="cart-eyebrow">Tu selección</p>
+              <h2 id="cart-title">Tu pedido</h2>
+            </div>
+            <span class="cart-count">{{ cartCount() }}</span>
           </div>
 
-          <button
-            type="button"
-            class="whatsapp-button"
-            [disabled]="!canSendOrder()"
-            (click)="sendOrderToWhatsApp()"
-          >
-            Enviar pedido por WhatsApp
-          </button>
-          @if (!canSendOrder()) {
-            <p class="configuration-note">WhatsApp pendiente de configurar.</p>
+          @if (cart().length === 0) {
+            <p class="empty-cart">Añade algo que te guste y aparecerá aquí.</p>
+          } @else {
+            <ul class="cart-list">
+              @for (item of cart(); track cartItemKey(item)) {
+                <li class="cart-item">
+                  <div class="cart-item-heading">
+                    <div class="cart-item-name">
+                      <strong>{{ item.product.name }}</strong>
+                      @if (item.variant) {
+                        <span>{{ variantLabel(item.variant) }}</span>
+                      }
+                    </div>
+                    <button type="button" class="remove-button" (click)="removeFromCart(item)">
+                      Quitar
+                    </button>
+                  </div>
+
+                  <div class="cart-item-footer">
+                    <div class="quantity-control" aria-label="Cantidad">
+                      <button type="button" aria-label="Restar una unidad" (click)="decreaseQuantity(item)">
+                        −
+                      </button>
+                      <span>{{ item.quantity }}</span>
+                      <button type="button" aria-label="Añadir una unidad" (click)="increaseQuantity(item)">
+                        +
+                      </button>
+                    </div>
+                    <strong>{{ (unitPriceCents(item) * item.quantity) / 100 | currency: 'USD' }}</strong>
+                  </div>
+                </li>
+              }
+            </ul>
+
+            <div class="cart-total">
+              <span>Subtotal</span>
+              <strong>{{ cartSubtotalCents() / 100 | currency: 'USD' }}</strong>
+            </div>
+
+            <button
+              type="button"
+              class="whatsapp-button"
+              [disabled]="!canSendOrder()"
+              (click)="sendOrderToWhatsApp()"
+            >
+              Continuar por WhatsApp <span aria-hidden="true">↗</span>
+            </button>
+            @if (!canSendOrder()) {
+              <p class="configuration-note">WhatsApp pendiente de configurar.</p>
+            }
+            <button type="button" class="clear-cart" (click)="clearCart()">Vaciar pedido</button>
           }
-          <button type="button" class="clear-cart" (click)="clearCart()">Vaciar carrito</button>
-        }
-      </aside>
-    </div>
+        </aside>
+      </div>
+    </section>
   </main>
 </div>
