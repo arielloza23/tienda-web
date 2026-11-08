@@ -2,7 +2,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "20261101_remove_stock"
-down_revision = None
+down_revision = "20261031_initial_schema"
 branch_labels = None
 depends_on = None
 

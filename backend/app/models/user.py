@@ -1,9 +1,13 @@
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.order import Order
 
 
 class UserRole(str, Enum):

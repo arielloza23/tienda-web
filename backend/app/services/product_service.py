@@ -25,6 +25,7 @@ def create_product(db: Session, payload: ProductCreate) -> Product:
         description=payload.description,
         price_cents=payload.price_cents,
         is_active=payload.is_active,
+        image_url=payload.image_url,
     )
 
     seen_skus: set[str] = set()

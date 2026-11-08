@@ -1,0 +1,51 @@
+<div class="delivery-map">
+  <div class="delivery-map-heading">
+    <div><span class="delivery-map-eyebrow">Punto de entrega</span><strong>¿Dónde te lo llevamos?</strong></div>
+    <span class="delivery-map-badge" [class.is-selected]="location()">{{ location() ? 'Marcado' : 'Marca un punto' }}</span>
+  </div>
+  <div class="delivery-map-city">
+    <label for="delivery-city">Ciudad de entrega</label>
+    <select id="delivery-city" [value]="selectedCity()" (change)="selectCity($any($event.target).value)">
+      <option value="" disabled>Selecciona tu ciudad</option>
+      @for (city of cities; track city.name) {
+        <option [value]="city.name">{{ city.name }}</option>
+      }
+    </select>
+  </div>
+  <div class="delivery-map-view">
+    <div #mapCanvas class="delivery-map-canvas" role="application"
+      aria-label="Mapa para marcar el punto exacto de entrega" aria-describedby="delivery-map-hint"></div>
+    <span class="delivery-map-overlay" aria-hidden="true">Toca el mapa para marcar</span>
+  </div>
+  <div class="delivery-map-actions">
+    <button class="delivery-map-locate" type="button" (click)="useCurrentLocation()" [disabled]="isLocating()">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+        <circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.5" /><path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+      </svg>
+      {{ isLocating() ? 'Buscando...' : 'Usar mi ubicación' }}
+    </button>
+    <button type="button" (click)="markMapCenter()">Marcar centro</button>
+  </div>
+  <div class="delivery-map-footer">
+  <p id="delivery-map-hint" class="delivery-map-hint" aria-live="polite">
+    @if (isLookingUpAddress()) {
+      Buscando la dirección del punto marcado...
+    } @else if (location()) {
+      <strong>Ubicación seleccionada</strong> Arrastra el pin para ajustar la entrega.
+    } @else {
+      Marca el lugar donde quieres recibir tu pedido.
+    }
+  </p>
+  @if (location()) {
+    <button type="button" class="delivery-map-clear" (click)="clearLocation()">Quitar</button>
+  }
+  </div>
+
+  @if (geolocationError()) {
+    <p class="delivery-map-error" role="alert">{{ geolocationError() }}</p>
+  }
+  @if (addressError()) {
+    <p class="delivery-map-error" role="alert">{{ addressError() }}</p>
+  }
+  <p class="delivery-map-credit">Direcciones: <a href="https://photon.komoot.io/" target="_blank" rel="noopener noreferrer">Photon</a> / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a></p>
+</div>

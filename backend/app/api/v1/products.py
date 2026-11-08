@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_admin
 from app.db.session import get_db
 from app.schemas.product import ProductCreate, ProductRead
 from app.services.product_service import create_product, get_product_by_id, get_products
@@ -21,7 +22,12 @@ def read_product(product_id: int, db: Session = Depends(get_db)) -> ProductRead:
     return product
 
 
-@router.post("", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ProductRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin)],
+)
 def create_new_product(payload: ProductCreate, db: Session = Depends(get_db)) -> ProductRead:
     try:
         return create_product(db, payload)

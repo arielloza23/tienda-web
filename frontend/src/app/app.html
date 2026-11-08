@@ -123,7 +123,27 @@
             <span class="cart-count">{{ cartCount() }}</span>
           </div>
 
-          @if (cart().length === 0) {
+          @if (orderConfirmation(); as confirmation) {
+            <section class="order-confirmation" role="status" aria-live="polite">
+              <p class="cart-eyebrow">Pedido recibido</p>
+              <h3>Gracias, {{ confirmation.customer_name }}.</h3>
+              <p>Registramos tu compra con el número <strong>#{{ confirmation.id }}</strong>.</p>
+              <div class="confirmation-total">
+                <span>Total del pedido</span>
+                <strong>{{ confirmation.total_cents / 100 | currency: 'USD' }}</strong>
+              </div>
+              <p class="confirmation-note">
+                Tu pedido ya está registrado. Abre el enlace para compartir el resumen por WhatsApp y coordinar el seguimiento.
+              </p>
+              @if (whatsappFollowupUrl(); as whatsappUrl) {
+                <a class="whatsapp-confirmation-link" [href]="whatsappUrl" target="_blank" rel="noopener noreferrer">
+                  Abrir seguimiento en WhatsApp <span aria-hidden="true">↗</span>
+                </a>
+              }
+              <p class="confirmation-note">Revisa el mensaje en WhatsApp y pulsa Enviar para contactar al negocio.</p>
+              <button type="button" class="clear-cart" (click)="startNewOrder()">Volver al catálogo</button>
+            </section>
+          } @else if (cart().length === 0) {
             <p class="empty-cart">Añade algo que te guste y aparecerá aquí.</p>
           } @else {
             <ul class="cart-list">
@@ -162,17 +182,71 @@
               <strong>{{ cartSubtotalCents() / 100 | currency: 'USD' }}</strong>
             </div>
 
-            <button
-              type="button"
-              class="whatsapp-button"
-              [disabled]="!canSendOrder()"
-              (click)="sendOrderToWhatsApp()"
-            >
-              Continuar por WhatsApp <span aria-hidden="true">↗</span>
-            </button>
-            @if (!canSendOrder()) {
-              <p class="configuration-note">WhatsApp pendiente de configurar.</p>
-            }
+            <form class="checkout-form" (ngSubmit)="placeOrder()">
+              <p class="option-label">Datos para la entrega</p>
+
+              <label for="customer-name">Nombre y apellido</label>
+              <input
+                id="customer-name"
+                name="customerName"
+                type="text"
+                autocomplete="name"
+                required
+                minlength="2"
+                maxlength="200"
+                [ngModel]="customerName()"
+                (ngModelChange)="customerName.set($event)"
+              />
+
+              <label for="customer-phone">Teléfono de contacto</label>
+              <input
+                id="customer-phone"
+                name="customerPhone"
+                type="tel"
+                autocomplete="tel"
+                inputmode="tel"
+                required
+                minlength="7"
+                maxlength="30"
+                [ngModel]="customerPhone()"
+                (ngModelChange)="customerPhone.set($event)"
+              />
+
+              <fieldset class="delivery-location-field">
+                <legend>Ubicación de entrega</legend>
+                <app-delivery-map
+                  [location]="deliveryLocation()"
+                  (locationChange)="deliveryLocation.set($event)"
+                  (addressChange)="deliveryAddress.set($event)"
+                  (addressLoadingChange)="isLookingUpAddress.set($event)"
+                />
+              </fieldset>
+
+              <label for="delivery-address">Dirección de entrega</label>
+              <textarea
+                id="delivery-address"
+                name="deliveryAddress"
+                autocomplete="street-address"
+                rows="3"
+                required
+                minlength="8"
+                maxlength="500"
+                placeholder="Se completará al marcar tu ubicación en el mapa"
+                aria-describedby="delivery-address-hint"
+                [readOnly]="isLookingUpAddress()"
+                [ngModel]="deliveryAddress()"
+                (ngModelChange)="deliveryAddress.set($event)"
+              ></textarea>
+              <small id="delivery-address-hint">Revisa la dirección detectada y añade casa, departamento o una referencia.</small>
+
+              @if (checkoutError()) {
+                <p class="checkout-error" role="alert">{{ checkoutError() }}</p>
+              }
+
+              <button type="submit" class="checkout-button" [disabled]="isSubmittingOrder() || isLookingUpAddress()">
+                {{ isSubmittingOrder() ? 'Registrando pedido...' : 'Confirmar pedido' }}
+              </button>
+            </form>
             <button type="button" class="clear-cart" (click)="clearCart()">Vaciar pedido</button>
           }
         </aside>

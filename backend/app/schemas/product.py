@@ -26,6 +26,7 @@ class ProductBase(BaseModel):
     description: Optional[str] = None
     price_cents: int = Field(..., ge=0)
     is_active: bool = True
+    image_url: Optional[str] = Field(default=None, max_length=500, pattern=r"^https://\S+$")
 
 
 class ProductCreate(ProductBase):

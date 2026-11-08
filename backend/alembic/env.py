@@ -3,6 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import app.models  # noqa: F401  (registra todos los modelos en Base.metadata)
 from app.db.base import Base
 from app.core.config import settings
 
@@ -22,6 +23,7 @@ def run_migrations_offline() -> None:
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
+        render_as_batch=url.startswith("sqlite"),
         compare_type=True,
     )
 
@@ -37,7 +39,12 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            render_as_batch=connection.dialect.name == "sqlite",
+        )
 
         with context.begin_transaction():
             context.run_migrations()

@@ -18,6 +18,7 @@ class Product(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     price_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     variants: Mapped[list["ProductVariant"]] = relationship(
         back_populates="product",

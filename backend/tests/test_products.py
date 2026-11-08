@@ -1,41 +1,4 @@
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from app.db.base import Base
-from app.db.session import get_db
-from app.main import app
-
-SQLALCHEMY_DATABASE_URL = "sqlite://"
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-@pytest.fixture(autouse=True)
-def reset_db() -> None:
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-
-
-@pytest.fixture
-def client() -> TestClient:
-    def override_get_db():
-        db = TestingSessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
 
 
 def test_list_products_returns_empty_list(client: TestClient) -> None:
@@ -102,3 +65,21 @@ def test_list_products_only_returns_available_products(client: TestClient) -> No
 
     inactive_product = client.get("/api/v1/products/2")
     assert inactive_product.status_code == 404
+
+
+def test_product_image_url(client: TestClient) -> None:
+    payload = {
+        "name": "Body Encaje",
+        "slug": "body-encaje",
+        "price_cents": 2500,
+        "image_url": "https://images.example.com/body.jpg",
+    }
+    response = client.post("/api/v1/products", json=payload)
+    assert response.status_code == 201
+    assert response.json()["image_url"] == payload["image_url"]
+
+    insecure = client.post(
+        "/api/v1/products",
+        json={**payload, "slug": "otro", "image_url": "javascript:alert(1)"},
+    )
+    assert insecure.status_code == 422

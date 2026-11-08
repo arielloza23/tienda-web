@@ -13,6 +13,7 @@ export interface Product {
   description?: string | null;
   price_cents: number;
   is_active: boolean;
+  image_url?: string | null;
   variants: ProductVariant[];
 }
 
