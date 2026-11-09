@@ -6,6 +6,13 @@ export interface ProductVariant {
   price_adjustment_cents: number;
 }
 
+export interface ProductImage {
+  id: number;
+  url: string;
+  alt: string;
+  color: string;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -14,6 +21,7 @@ export interface Product {
   price_cents: number;
   is_active: boolean;
   image_url?: string | null;
+  images?: ProductImage[];
   variants: ProductVariant[];
 }
 

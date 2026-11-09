@@ -1,0 +1,30 @@
+﻿app-root app-product-showcase {
+.showcase-photo { position: relative; z-index: 1; margin: 0 0 20px; width: min(100%, 310px); height: 405px; border-radius: 155px 155px 10px 10px; box-shadow: 0 24px 45px #0003; overflow: hidden; transform: rotate(-3deg); animation: reveal-product 650ms cubic-bezier(.2,.7,.2,1) both; }
+.showcase-photo img { width: 100%; height: 100%; object-fit: cover; display: block; user-select: none; }
+.showcase-photo figcaption { position: absolute; inset: auto 0 0; display: flex; justify-content: space-between; align-items: center; padding: 35px 20px 17px; background: linear-gradient(transparent, #0008); color: white; font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; }
+.showcase-photo figcaption span:last-child { font-size: 1.3rem; }
+
+  .showcase-media { min-width: 0; width: 100%; }
+  .photo-expand { position: absolute; right: 13px; top: 17px; display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #ffffff80; border-radius: 50%; background: #20202080; color: #fff; font: inherit; font-size: 1.4rem; cursor: pointer; }
+  .photo-thumbnails { display: flex; justify-content: center; flex-wrap: wrap; gap: 7px; margin: 0 0 8px; }
+  .photo-thumbnails button { width: 48px; height: 60px; overflow: hidden; padding: 2px; border: 1px solid #ffffff40; border-radius: 5px; background: transparent; cursor: pointer; }
+  .photo-thumbnails button.active { border-color: #fff; background: #ffffff40; }
+  .photo-thumbnails img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 3px; }
+  .photo-count { text-align: center; color: var(--showcase-muted); font-size: .6rem; margin: 0 0 8px; }
+  .photo-empty { color: var(--showcase-muted); font-size: .8rem; text-align: center; }
+  .showcase-media .stage-arrow { display: grid; place-items: center; position: absolute; z-index: 3; top: 40%; width: 40px; height: 40px; border: 1px solid #ffffff66; border-radius: 50%; background: #202020b3; color: #fff; font-size: 1rem; cursor: pointer; }
+  .stage-arrow-prev { left: -8px; }
+  .stage-arrow-next { right: -8px; }
+  .photo-dialog { position: fixed; inset: 16px; width: min(1000px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); margin: auto; padding: 20px; border: 0; border-radius: 14px; background: #faf8f4; color: #242e28; text-align: center; }
+  .photo-dialog::backdrop { background: #101510cc; backdrop-filter: blur(6px); }
+  .photo-dialog > img { display: block; width: 100%; height: min(70dvh, 800px); object-fit: contain; }
+  .photo-dialog p { margin: 12px 0; font-size: .75rem; }
+  .photo-dialog-close { position: sticky; top: 0; float: right; z-index: 2; width: 40px; height: 40px; border: 1px solid #cdd2c8; border-radius: 50%; background: #faf8f4; color: #242e28; font: inherit; font-size: 1.6rem; cursor: pointer; }
+  .photo-dialog-controls { display: flex; align-items: center; justify-content: center; gap: 20px; font-size: .75rem; }
+  .photo-dialog-controls button { width: 44px; height: 44px; border: 1px solid #cdd2c8; border-radius: 50%; background: transparent; color: #242e28; font: inherit; cursor: pointer; }
+  .photo-dialog button:focus-visible, .photo-thumbnails button:focus-visible { outline: 2px solid #ae7954; outline-offset: 3px; }
+}
+@keyframes reveal-product {
+  from { opacity: 0; transform: translate(40px, 12px) rotate(3deg) scale(.94); }
+  to { opacity: 1; transform: translate(0) rotate(-3deg) scale(1); }
+}

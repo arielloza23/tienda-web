@@ -20,10 +20,27 @@ class Product(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
+    images: Mapped[list["ProductImage"]] = relationship(
+        back_populates="product", cascade="all, delete-orphan", order_by="ProductImage.position",
+    )
+
     variants: Mapped[list["ProductVariant"]] = relationship(
         back_populates="product",
         cascade="all, delete-orphan",
     )
+
+
+class ProductImage(Base):
+    __tablename__ = "product_images"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    alt: Mapped[str] = mapped_column(String(200), nullable=False)
+    color: Mapped[str] = mapped_column(String(50), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    product: Mapped[Product] = relationship(back_populates="images")
 
 
 class ProductVariant(Base):

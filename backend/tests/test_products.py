@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import pytest
 
 
 def test_list_products_returns_empty_list(client: TestClient) -> None:
@@ -83,3 +84,34 @@ def test_product_image_url(client: TestClient) -> None:
         json={**payload, "slug": "otro", "image_url": "javascript:alert(1)"},
     )
     assert insecure.status_code == 422
+
+
+def test_product_gallery_preserves_order_and_color(client: TestClient) -> None:
+    payload = {
+        "name": "Top Negro", "slug": "top-negro-gallery", "price_cents": 2500,
+        "variants": [{"sku": "TOP-GALLERY-M", "size": "M", "color": "Negro"}],
+        "images": [
+            {"url": "https://example.com/front.jpg", "alt": "Vista frontal", "color": " negro "},
+            {"url": "https://example.com/back.jpg", "alt": "Vista posterior", "color": "Negro"},
+        ],
+    }
+    response = client.post("/api/v1/products", json=payload)
+    assert response.status_code == 201
+    images = client.get(f"/api/v1/products/{response.json()['id']}").json()["images"]
+    assert [image["url"] for image in images] == [image["url"] for image in payload["images"]]
+    assert {image["color"] for image in images} == {"Negro"}
+
+
+@pytest.mark.parametrize("bad_image, expected_status", [
+    ({"url": "https://example.com/wine.jpg", "alt": "Otro color", "color": "Vino"}, 400),
+    ({"url": "javascript:alert(1)", "alt": "Foto inválida", "color": "Negro"}, 422),
+    ({"url": "https://example.com/front.jpg", "alt": "Foto", "color": " "}, 422),
+])
+def test_product_gallery_rejects_wrong_color_and_invalid_images(client: TestClient, bad_image, expected_status) -> None:
+    response = client.post("/api/v1/products", json={
+        "name": "Top Negro", "slug": "invalid-gallery", "price_cents": 2500,
+        "variants": [{"sku": "INVALID-GALLERY-M", "size": "M", "color": "Negro"}],
+        "images": [bad_image],
+    })
+    assert response.status_code == expected_status
+    assert client.get("/api/v1/products").json() == []

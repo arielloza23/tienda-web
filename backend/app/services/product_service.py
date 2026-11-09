@@ -2,7 +2,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.models.product import Product, ProductVariant
+from app.models.product import Product, ProductImage, ProductVariant
 from app.schemas.product import ProductCreate
 
 
@@ -48,6 +48,20 @@ def create_product(db: Session, payload: ProductCreate) -> Product:
                 price_adjustment_cents=variant_data.price_adjustment_cents,
             )
         )
+
+    colors = {variant.color.strip().casefold(): variant.color.strip() for variant in payload.variants if variant.color and variant.color.strip()}
+    seen_images: set[tuple[str, str]] = set()
+    for position, image in enumerate(payload.images):
+        color_key = image.color.casefold()
+        if colors and color_key not in colors:
+            raise ValueError("El color de cada foto debe pertenecer al producto. No mezcles fotos de otros colores.")
+        key = (image.url, color_key)
+        if key in seen_images:
+            raise ValueError("No repitas una foto para el mismo color.")
+        seen_images.add(key)
+        product.images.append(ProductImage(
+            url=image.url, alt=image.alt, color=colors.get(color_key, image.color), position=position,
+        ))
 
     db.add(product)
     db.commit()

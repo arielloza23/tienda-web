@@ -1,0 +1,104 @@
+<section class="showcase" [class.wine]="theme() === 'wine'" [class.previous]="direction() === 'previous'"
+  role="region" aria-roledescription="carrusel" aria-label="Selección destacada de lencería">
+  <div class="showcase-topline"><span>LA COLECCIÓN · ENCAJE ESENCIAL</span><a href="#catalog">Ver todos los diseños <span aria-hidden="true">↗</span></a></div>
+  @if (product(); as featured) {
+    <div class="showcase-layout">
+      <div class="showcase-copy">
+        <p class="showcase-kicker"><span></span> Un detalle. Todo cambia.</p>
+        <h1>Tu esencia.<br /> Tu estilo.<br /><em>Solo tuyo.</em></h1>
+        <p class="showcase-intro">Piezas que se sienten tan bien<br />como se ven. Encuentra la tuya.</p>
+        <a class="showcase-explore" href="#catalog">Descubrir la colección <span aria-hidden="true">↗</span></a>
+      </div>
+
+      <div class="showcase-media">
+      <div class="showcase-stage" tabindex="0" aria-label="Galería del producto. Usa las flechas para ver sus fotos."
+        (keydown.arrowleft)="movePhoto(-1); $event.preventDefault()" (keydown.arrowright)="movePhoto(1); $event.preventDefault()"
+        (pointerdown)="startGesture($event)" (pointerup)="finishGesture($event)">
+        <span class="stage-word" aria-hidden="true">íntima</span>
+        @for (photo of currentPhoto() ? [currentPhoto()!] : []; track photo.url) {
+          <figure class="showcase-photo">
+            <img [src]="photo.url" [alt]="photo.alt" width="700" height="900" fetchpriority="high" draggable="false" />
+            <figcaption><span>Detalles para ti</span><span aria-hidden="true">✳</span></figcaption>
+            <button type="button" class="photo-expand" (click)="openPhoto()" aria-label="Ampliar foto del producto">⤢</button>
+          </figure>
+        }
+        @if (!currentPhoto()) { <p class="photo-empty">No hay fotos disponibles para este color.</p> }
+        <div class="stage-shadow" aria-hidden="true"></div>
+        @if (photos().length > 1) {
+          <button type="button" class="stage-arrow stage-arrow-prev" aria-label="Foto anterior" (click)="movePhoto(-1)">←</button>
+          <button type="button" class="stage-arrow stage-arrow-next" aria-label="Siguiente foto" (click)="movePhoto(1)">→</button>
+        }
+      </div>
+      @if (photos().length > 1) {
+        <div class="photo-thumbnails" role="group" [attr.aria-label]="'Fotos de ' + featured.name + ', color ' + photoColor()">
+          @for (photo of photos(); track photo.url; let i = $index) {
+            <button type="button" [class.active]="photoIndex() === i" [attr.aria-pressed]="photoIndex() === i"
+              [attr.aria-label]="'Ver foto ' + (i + 1) + ': ' + photo.alt" (click)="photoIndex.set(i)">
+              <img [src]="photo.url" [alt]="photo.alt" width="48" height="58" loading="lazy" />
+            </button>
+          }
+        </div>
+        <p class="photo-count">{{ photoIndex() + 1 }} / {{ photos().length }} fotos · {{ photoColor() }}</p>
+      }
+      </div>
+
+      <div class="showcase-details" aria-live="polite" aria-atomic="false">
+        <p class="showcase-product-label">Tu próximo favorito</p>
+        <h2>{{ featured.name }}</h2>
+        <p class="showcase-price">{{ price() / 100 | currency: 'USD' }} <span>USD</span></p>
+        <p class="showcase-description">{{ featured.description || 'El encanto está en los pequeños detalles.' }}</p>
+        @if (featured.variants.length) {
+          <fieldset class="showcase-sizes">
+            <legend>Elige tu talla <span>{{ selectedVariant()?.size || '' }}</span></legend>
+            @for (variant of featured.variants; track variant.id) {
+              <button type="button" [class.selected]="variantId() === variant.id" [attr.aria-pressed]="variantId() === variant.id"
+                [attr.aria-label]="'Talla ' + (variant.size || 'única') + ', ' + (variant.color || '')" (click)="variantId.set(variant.id)">
+                {{ variant.size || 'Única' }}
+                @if (featured.variants.length > 3) { <small>{{ variant.color }}</small> }
+              </button>
+            }
+          </fieldset>
+        }
+        <button type="button" class="showcase-add" [disabled]="!!featured.variants.length && !selectedVariant()" (click)="addToOrder()">
+          {{ featured.variants.length && !selectedVariant() ? 'Selecciona tu talla' : 'Añadir a mi pedido' }} <span aria-hidden="true">+</span>
+        </button>
+        <p class="showcase-delivery">Elige tu entrega y coordina por WhatsApp.</p>
+      </div>
+    </div>
+
+    <div class="showcase-bottom">
+      <div class="showcase-navigation" aria-label="Navegar productos destacados">
+        <button type="button" class="showcase-arrow" aria-label="Producto anterior" [disabled]="products().length < 2" (click)="move(-1)">←</button>
+        <span class="showcase-counter"><b>{{ (index() + 1).toString().padStart(2, '0') }}</b><span> / {{ products().length.toString().padStart(2, '0') }}</span></span>
+        <button type="button" class="showcase-arrow" aria-label="Siguiente producto" [disabled]="products().length < 2" (click)="move(1)">→</button>
+      </div>
+      <div class="showcase-dots" role="group" aria-label="Elegir producto destacado">
+        @for (item of products(); track item.id; let i = $index) {
+          <button type="button" [class.active]="index() === i" [attr.aria-label]="'Ver ' + item.name" [attr.aria-pressed]="index() === i" (click)="goTo(i)"><span></span></button>
+        }
+      </div>
+      @if (nextProduct(); as next) {
+        @if (products().length > 1) {
+          <button type="button" class="showcase-next" (click)="move(1)" [attr.aria-label]="'Siguiente: ' + next.name">
+            <span><small>A CONTINUACIÓN</small>{{ next.name }} <b aria-hidden="true">↗</b></span>
+            @if (next.image_url) { <img [src]="next.image_url" alt="" width="44" height="54" /> }
+          </button>
+        }
+      }
+    </div>
+  } @else {
+    <div class="showcase-empty"><p class="showcase-kicker">Lencería de encaje</p><h1>Tu esencia.<br /><em>Solo tuyo.</em></h1><a class="showcase-explore" href="#catalog">Explorar catálogo ↗</a></div>
+  }
+</section>
+<dialog #photoDialog class="photo-dialog" aria-label="Foto ampliada del producto"
+  (click)="$event.target === $event.currentTarget && closePhoto()"
+  (keydown.arrowleft)="movePhoto(-1); $event.preventDefault()" (keydown.arrowright)="movePhoto(1); $event.preventDefault()">
+  <button type="button" class="photo-dialog-close" aria-label="Cerrar foto ampliada" (click)="closePhoto()">×</button>
+  @if (currentPhoto(); as photo) {
+    <img [src]="photo.url" [alt]="photo.alt" />
+    <p>{{ photo.alt }} · {{ photoColor() }}</p>
+  }
+  @if (photos().length > 1) {
+    <div class="photo-dialog-controls"><button type="button" aria-label="Foto anterior" (click)="movePhoto(-1)">←</button><span>{{ photoIndex() + 1 }} / {{ photos().length }}</span><button type="button" aria-label="Siguiente foto" (click)="movePhoto(1)">→</button></div>
+  }
+</dialog>

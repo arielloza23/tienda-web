@@ -1,9 +1,11 @@
 import { CommonModule, CurrencyPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, ElementRef, inject, OnInit, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { DeliveryLocation, DeliveryMap } from './components/delivery-map/delivery-map';
+import type { DeliveryLocation } from './components/delivery-map/delivery-map';
+import { DeliveryMap } from './components/delivery-map/delivery-map';
+import { ProductShowcase } from './components/product-showcase/product-showcase';
 import { CartItem, Product, ProductVariant } from './models/product.model';
 import { OrderCreateRequest, OrderReceipt } from './models/order.model';
 import { OrderService } from './services/order.service';
@@ -11,12 +13,13 @@ import { ProductService } from './services/product.service';
 import { STORE_CONFIG } from './store-config';
 
 @Component({
-  imports: [CommonModule, CurrencyPipe, FormsModule, DeliveryMap],
+  imports: [CommonModule, CurrencyPipe, FormsModule, DeliveryMap, ProductShowcase],
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',
 })
 export class App implements OnInit {
+  private feedbackTimeout?: ReturnType<typeof setTimeout>;
   private readonly productService = inject(ProductService);
   private readonly orderService = inject(OrderService);
   private readonly whatsappPhone = STORE_CONFIG.whatsappPhone.replace(/\D/g, '');
@@ -24,6 +27,17 @@ export class App implements OnInit {
     'https://images.pexels.com/photos/33114806/pexels-photo-33114806.jpeg?auto=compress&cs=tinysrgb&w=900';
 
   protected readonly products = signal<Product[]>([]);
+  protected readonly activeColor = signal('Todos');
+  protected readonly featuredProductId = signal<number | null>(null);
+  protected readonly cartOpen = signal(false);
+  private readonly cartDialog = viewChild.required<ElementRef<HTMLDialogElement>>('cartDialog');
+  protected readonly cartFeedback = signal('');
+  protected readonly availableColors = computed(() => ['Todos', ...new Set(
+    this.products().flatMap((product) => product.variants.map((variant) => variant.color?.trim()).filter((color): color is string => !!color)),
+  )]);
+  protected readonly visibleProducts = computed(() => this.activeColor() === 'Todos'
+    ? this.products()
+    : this.products().filter((product) => product.variants.some((variant) => variant.color?.trim() === this.activeColor())));
   protected readonly cart = signal<CartItem[]>([]);
   protected readonly isLoading = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -37,13 +51,15 @@ export class App implements OnInit {
   protected readonly orderConfirmation = signal<OrderReceipt | null>(null);
   protected readonly whatsappFollowupUrl = signal<string | null>(null);
 
-  protected readonly totalProducts = computed(() => this.products().length);
   protected readonly cartCount = computed(() =>
     this.cart().reduce((count, item) => count + item.quantity, 0),
   );
   protected readonly cartSubtotalCents = computed(() =>
     this.cart().reduce((total, item) => total + this.unitPriceCents(item) * item.quantity, 0),
   );
+  constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.feedbackTimeout));
+  }
   ngOnInit(): void {
     this.loadProducts();
   }
@@ -68,7 +84,31 @@ export class App implements OnInit {
     return product.image_url || this.fallbackProductImage;
   }
 
+  protected showProduct(product: Product): void {
+    this.featuredProductId.set(product.id);
+    document.getElementById('top')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    document.querySelector<HTMLElement>('.showcase-stage')?.focus({ preventScroll: true });
+  }
+
+  protected openCart(): void {
+    this.cartDialog().nativeElement.showModal();
+    this.cartOpen.set(true);
+  }
+
+  protected closeCart(): void {
+    this.cartDialog().nativeElement.close();
+    this.cartOpen.set(false);
+  }
+
+  protected dismissCartBackdrop(event: MouseEvent): void {
+    const dialog = this.cartDialog().nativeElement;
+    if (event.target !== dialog) return;
+    const box = dialog.getBoundingClientRect();
+    if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) this.closeCart();
+  }
+
   protected addToCart(product: Product, variant: ProductVariant | null = null): void {
+    if (this.orderConfirmation()) this.startNewOrder();
     this.cart.update((items) => {
       const existing = items.find((item) => this.isSameCartLine(item, product, variant));
       if (existing) {
@@ -81,6 +121,9 @@ export class App implements OnInit {
 
       return [...items, { product, variant, quantity: 1 }];
     });
+    clearTimeout(this.feedbackTimeout);
+    this.cartFeedback.set(`${product.name}${variant?.size ? ', talla ' + variant.size : ''} añadido. ${this.cartCount()} ${this.cartCount() === 1 ? 'unidad' : 'unidades'} en tu pedido.`);
+    this.feedbackTimeout = setTimeout(() => this.cartFeedback.set(''), 3500);
   }
 
   protected increaseQuantity(itemToChange: CartItem): void {

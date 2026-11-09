@@ -1,3 +1,9 @@
+@use './styles/store-checkout';
+@use './styles/store-editorial';
+@use './styles/product-gallery';
+
+body:has(dialog[open]) { overflow: hidden; }
+
 html,
 body {
   margin: 0;

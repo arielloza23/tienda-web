@@ -1,126 +1,75 @@
-﻿<div class="page-shell">
+<div class="page-shell">
+  <a class="skip-link" href="#catalog">Ir al catálogo</a>
+  <div class="announcement">Detalles que se sienten. Diseños que te acompañan. <span>Ecuador · USD</span></div>
   <header class="topbar">
     <a class="brand" href="#top" aria-label="Tienda Web, inicio">
-      TIENDA <span>WEB</span>
+      <span class="brand-symbol" aria-hidden="true">tw.</span><span class="brand-name">TIENDA WEB<small>LENCERÍA &amp; ESENCIA</small></span>
     </a>
     <nav class="topbar-actions" aria-label="Navegación principal">
       <a class="nav-link" href="#catalog">Catálogo</a>
-      <a class="cart-link" href="#cart" aria-label="Ir a tu pedido">
+      <a class="nav-link how-link" href="#how-it-works">Cómo comprar</a>
+      <button type="button" class="cart-link" (click)="openCart()" aria-haspopup="dialog">
         Tu pedido <span class="cart-count">{{ cartCount() }}</span>
-      </a>
+      </button>
     </nav>
   </header>
 
   <main class="content" id="top">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <p class="eyebrow">Lencería de encaje</p>
-        <h1 id="hero-title">Intimidad,<br /><em>bien elegida.</em></h1>
-        <p class="subtitle">
-          Diseños delicados en tonos clásicos, con tallas para encontrar tu estilo.
-        </p>
-        <a class="hero-link" href="#catalog">
-          Descubrir la selección <span aria-hidden="true">↓</span>
-        </a>
-      </div>
-
-      <figure class="hero-visual">
-        <img
-          src="https://images.pexels.com/photos/33114806/pexels-photo-33114806.jpeg?auto=compress&cs=tinysrgb&w=1600"
-          alt="Top corsé negro de encaje"
-          width="1600"
-          height="1100"
-          fetchpriority="high"
-        />
-        <figcaption class="hero-caption">
-          <span>En foco</span>
-          <strong>Top corsé de encaje</strong>
-          <span>01 / {{ totalProducts() }}</span>
-        </figcaption>
-      </figure>
-
-      <div class="hero-footnote">
-        <span>Tallas S, M y L</span>
-        <span>{{ totalProducts() }} diseños disponibles</span>
-      </div>
-    </section>
+    <app-product-showcase
+      [products]="products()"
+      [(selectedProductId)]="featuredProductId"
+      (addProduct)="addToCart($event.product, $event.variant)"
+    />
 
     <section class="collection" id="catalog" aria-labelledby="collection-title">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">Selección actual</p>
-          <h2 id="collection-title">Encaje, color y comodidad.</h2>
-        </div>
-        <a class="section-link" href="#cart">Ver pedido <span aria-hidden="true">↗</span></a>
+      <div class="miniature-heading">
+        <div><p class="eyebrow">Encuentra tu favorito</p><h2 id="collection-title">Explora la colección</h2></div>
+        <span>Selecciona una imagen para verla en la portada <span aria-hidden="true">↑</span></span>
       </div>
-
-      <div class="shopping-layout">
-        <section class="products-panel" aria-label="Productos disponibles">
-          @if (isLoading()) {
-            <div class="state-card loading">Cargando productos...</div>
-          } @else if (error()) {
-            <div class="state-card error">{{ error() }}</div>
-          } @else if (products().length === 0) {
-            <div class="state-card">No hay productos disponibles.</div>
-          } @else {
-            <div class="product-grid">
-              @for (product of products(); track product.id) {
-                <article class="product-card">
-                  <figure class="product-visual">
-                    <img [src]="productImage(product)" [alt]="product.name" loading="lazy" />
-                    <span class="badge">Disponible</span>
-                  </figure>
-
-                  <div class="product-content">
-                    <div class="product-title-row">
-                      <h3>{{ product.name }}</h3>
-                      <strong class="price">{{ product.price_cents / 100 | currency: 'USD' }}</strong>
-                    </div>
-                    <p class="description">
-                      {{ product.description || 'Un esencial elegido para acompañarte cada día.' }}
-                    </p>
-                  </div>
-
-                  @if (product.variants.length) {
-                    <div class="variants">
-                      <p class="option-label">Tallas disponibles</p>
-                      <ul>
-                        @for (variant of product.variants; track variant.id) {
-                          <li class="variant-option">
-                            <span>{{ variant.size || 'Talla única' }}</span>
-                            <strong class="variant-price">
-                              {{ (product.price_cents + variant.price_adjustment_cents) / 100 | currency: 'USD' }}
-                            </strong>
-                            <button
-                              type="button"
-                              class="add-button"
-                              [attr.aria-label]="'Añadir ' + product.name + ', talla ' + variant.size"
-                              (click)="addToCart(product, variant)"
-                            >
-                              <span aria-hidden="true">+</span>
-                            </button>
-                          </li>
-                        }
-                      </ul>
-                    </div>
-                  } @else {
-                    <button type="button" class="add-button add-product" (click)="addToCart(product)">
-                      Añadir al pedido <span aria-hidden="true">+</span>
-                    </button>
-                  }
-                </article>
-              }
-            </div>
+      <div class="catalog-toolbar">
+        <div class="color-filters" role="group" aria-label="Filtrar por color">
+          @for (color of availableColors(); track color) {
+            <button type="button" [class.active]="activeColor() === color" [attr.aria-pressed]="activeColor() === color" (click)="activeColor.set(color)">{{ color }}</button>
           }
-        </section>
-
-        <aside class="cart-panel" id="cart" aria-labelledby="cart-title">
+        </div>
+        <span class="result-count" aria-live="polite">{{ visibleProducts().length }} diseños</span>
+      </div>
+      @if (isLoading()) {
+        <div class="state-card">Cargando productos...</div>
+      } @else if (error()) {
+        <div class="state-card error" role="alert"><p>{{ error() }}</p><button type="button" class="retry-button" (click)="loadProducts()">Volver a intentar</button></div>
+      } @else if (products().length === 0) {
+        <div class="state-card">No hay productos disponibles.</div>
+      } @else {
+        <div class="product-miniatures" role="group" aria-label="Abrir un producto en la portada">
+          @for (product of visibleProducts(); track product.id) {
+            <button type="button" class="product-miniature" [class.is-active]="(featuredProductId() ?? products()[0]?.id) === product.id"
+              [attr.aria-pressed]="(featuredProductId() ?? products()[0]?.id) === product.id" (click)="showProduct(product)">
+              <span class="miniature-image"><img [src]="productImage(product)" [alt]="product.name" loading="lazy" /><span class="miniature-open" aria-hidden="true">↗</span></span>
+              <span class="miniature-name">{{ product.name }}</span>
+              <span class="miniature-price">{{ product.price_cents / 100 | currency: 'USD' }}</span>
+            </button>
+          }
+        </div>
+      }
+    </section>
+    <section class="how-section" id="how-it-works" aria-labelledby="how-title">
+      <div><p class="eyebrow">Así de sencillo</p><h2 id="how-title">De tu favorito<br /><em>a tu puerta.</em></h2></div>
+      <ol class="how-steps">
+        <li><span>01</span><h3>Encuentra tu pieza</h3><p>Explora los colores y elige la talla que buscas.</p></li>
+        <li><span>02</span><h3>Marca tu ubicación</h3><p>Selecciona tu ciudad y señala el punto de entrega en el mapa.</p></li>
+        <li><span>03</span><h3>Hablemos por WhatsApp</h3><p>Comparte el resumen y coordina los detalles de tu pedido.</p></li>
+      </ol>
+    </section>
+  </main>
+        <dialog #cartDialog class="cart-panel" id="cart" aria-labelledby="cart-title" (close)="cartOpen.set(false)" (click)="dismissCartBackdrop($event)">
           <div class="cart-heading">
             <div>
-              <p class="cart-eyebrow">Tu selección</p>
+              <p class="cart-eyebrow">Elegido por ti</p>
               <h2 id="cart-title">Tu pedido</h2>
             </div>
             <span class="cart-count">{{ cartCount() }}</span>
+            <button type="button" class="cart-close" aria-label="Cerrar pedido" (click)="closeCart()">×</button>
           </div>
 
           @if (orderConfirmation(); as confirmation) {
@@ -141,14 +90,16 @@
                 </a>
               }
               <p class="confirmation-note">Revisa el mensaje en WhatsApp y pulsa Enviar para contactar al negocio.</p>
-              <button type="button" class="clear-cart" (click)="startNewOrder()">Volver al catálogo</button>
+              <button type="button" class="clear-cart" (click)="startNewOrder(); closeCart()">Volver al catálogo</button>
             </section>
           } @else if (cart().length === 0) {
-            <p class="empty-cart">Añade algo que te guste y aparecerá aquí.</p>
+            <div class="empty-cart"><span class="empty-cart-symbol" aria-hidden="true">＋</span><h3>Un espacio para tus favoritos.</h3><p>Elige una pieza y tu talla. Aquí empieza tu próximo pedido.</p><a href="#catalog" (click)="closeCart()">Explorar la colección ↗</a></div>
           } @else {
             <ul class="cart-list">
               @for (item of cart(); track cartItemKey(item)) {
                 <li class="cart-item">
+                  <img class="cart-thumbnail" [src]="productImage(item.product)" [alt]="item.product.name" loading="lazy" />
+                  <div class="cart-item-details">
                   <div class="cart-item-heading">
                     <div class="cart-item-name">
                       <strong>{{ item.product.name }}</strong>
@@ -173,6 +124,7 @@
                     </div>
                     <strong>{{ (unitPriceCents(item) * item.quantity) / 100 | currency: 'USD' }}</strong>
                   </div>
+                  </div>
                 </li>
               }
             </ul>
@@ -182,8 +134,8 @@
               <strong>{{ cartSubtotalCents() / 100 | currency: 'USD' }}</strong>
             </div>
 
-            <form class="checkout-form" (ngSubmit)="placeOrder()">
-              <p class="option-label">Datos para la entrega</p>
+            <form class="checkout-form" ngNativeValidate (ngSubmit)="placeOrder()">
+              <div class="checkout-heading"><span>02</span><div><h3>¿A dónde te lo llevamos?</h3><p>Completa tus datos y marca la entrega.</p></div></div>
 
               <label for="customer-name">Nombre y apellido</label>
               <input
@@ -194,6 +146,7 @@
                 required
                 minlength="2"
                 maxlength="200"
+                placeholder="Tu nombre completo"
                 [ngModel]="customerName()"
                 (ngModelChange)="customerName.set($event)"
               />
@@ -208,18 +161,23 @@
                 required
                 minlength="7"
                 maxlength="30"
+                placeholder="Ej. 099 123 4567"
                 [ngModel]="customerPhone()"
                 (ngModelChange)="customerPhone.set($event)"
               />
 
               <fieldset class="delivery-location-field">
                 <legend>Ubicación de entrega</legend>
+                @defer (on viewport) {
                 <app-delivery-map
                   [location]="deliveryLocation()"
                   (locationChange)="deliveryLocation.set($event)"
                   (addressChange)="deliveryAddress.set($event)"
                   (addressLoadingChange)="isLookingUpAddress.set($event)"
                 />
+                } @placeholder {
+                  <p class="map-placeholder">El mapa se cargará aquí para marcar tu entrega.</p>
+                }
               </fieldset>
 
               <label for="delivery-address">Dirección de entrega</label>
@@ -244,13 +202,17 @@
               }
 
               <button type="submit" class="checkout-button" [disabled]="isSubmittingOrder() || isLookingUpAddress()">
-                {{ isSubmittingOrder() ? 'Registrando pedido...' : 'Confirmar pedido' }}
+                {{ isSubmittingOrder() ? 'Registrando pedido...' : isLookingUpAddress() ? 'Buscando dirección...' : 'Confirmar mi pedido' }} <span aria-hidden="true">↗</span>
               </button>
+              <p class="checkout-note">Después podrás compartir tu pedido por WhatsApp y coordinar el envío.</p>
             </form>
             <button type="button" class="clear-cart" (click)="clearCart()">Vaciar pedido</button>
           }
-        </aside>
-      </div>
-    </section>
-  </main>
+        </dialog>
+  <footer class="footer"><a class="footer-brand" href="#top">tienda web<span>Pequeños detalles. Muy tuyos.</span></a><a href="#catalog">Volver a la colección ↑</a><span>Ecuador · Precios en USD</span></footer>
+  <div class="cart-feedback" role="status" aria-live="polite">{{ cartFeedback() }}</div>
+  <button type="button" class="floating-cart" (click)="openCart()" aria-haspopup="dialog" [attr.aria-expanded]="cartOpen()" aria-controls="cart">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 7h14l1 14H4L5 7Z" /><path d="M8 8V6a4 4 0 0 1 8 0v2" /></svg>
+    <span>Tu pedido <b>{{ cartCount() }}</b><small>{{ cartSubtotalCents() / 100 | currency: 'USD' }}</small></span><span aria-hidden="true">↗</span>
+  </button>
 </div>

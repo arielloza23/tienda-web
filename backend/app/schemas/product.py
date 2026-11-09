@@ -29,8 +29,23 @@ class ProductBase(BaseModel):
     image_url: Optional[str] = Field(default=None, max_length=500, pattern=r"^https://\S+$")
 
 
+class ProductImageCreate(BaseModel):
+    url: str = Field(max_length=500, pattern=r"^https://\S+$")
+    alt: str = Field(min_length=2, max_length=200)
+    color: str = Field(min_length=1, max_length=50)
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class ProductImageRead(ProductImageCreate):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ProductCreate(ProductBase):
     variants: list[ProductVariantCreate] = Field(default_factory=list)
+    images: list[ProductImageCreate] = Field(default_factory=list, max_length=12)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -38,5 +53,6 @@ class ProductCreate(ProductBase):
 class ProductRead(ProductBase):
     id: int
     variants: list[ProductVariantRead] = Field(default_factory=list)
+    images: list[ProductImageRead] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

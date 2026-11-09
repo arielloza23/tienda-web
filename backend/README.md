@@ -2,13 +2,31 @@
 
 ## Requisitos
 
-- Python 3.11+
+- Python 3.13 (versión del entorno local, fijada en `.python-version` en la raíz)
 - PostgreSQL disponible
 
 ## Instalación
 
+Desde la raíz del repositorio, con `uv` instalado:
+
+```powershell
+uv python install 3.13
+uv venv --python 3.13 .venv
+.\.venv\Scripts\python.exe -m ensurepip --upgrade
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
+```
+
+Para ejecutar las pruebas en Windows:
+
+```powershell
+cd backend
+..\.venv\Scripts\python.exe -m pytest -q
+```
+
+Alternativamente, desde `backend`, usando Python 3.13:
+
 ```bash
-python -m venv .venv
+python3.13 -m venv .venv
 . .venv/bin/activate  # o .venv\Scripts\activate en Windows
 pip install -r requirements.txt
 cp .env.example .env
@@ -37,6 +55,13 @@ alembic upgrade head
 Las bases antiguas creadas con `create_all` (sin tabla `alembic_version`) se adoptan
 automáticamente con `alembic upgrade head`: la migración inicial no recrea tablas existentes.
 `tests/test_migrations.py` comprueba que las migraciones producen exactamente el esquema de los modelos.
+
+## Fotos de productos
+
+Cada producto puede incluir hasta 12 fotos adicionales en `images`, con `url`
+(HTTPS), `alt` y `color`. El color debe coincidir con una variante del producto.
+La galería muestra únicamente las fotos del color seleccionado y mantiene
+`image_url` como portada. Tras actualizar el código, ejecuta `alembic upgrade head`.
 
 ## Autenticación y administración
 
