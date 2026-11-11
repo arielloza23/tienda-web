@@ -35,8 +35,10 @@ export class ProductShowcase {
   private readonly photoDialog = viewChild.required<ElementRef<HTMLDialogElement>>('photoDialog');
   protected readonly price = computed(() => (this.product()?.price_cents ?? 0) + (this.selectedVariant()?.price_adjustment_cents ?? 0));
   protected readonly theme = computed(() => {
-    const colors = this.product()?.variants.map((variant) => variant.color?.toLowerCase()).join(' ') ?? '';
-    return colors.includes('vino') || colors.includes('rojo') ? 'wine' : 'charcoal';
+    const color = this.photoColor().trim().toLocaleLowerCase();
+    if (/vino|rojo|burdeos/.test(color)) return 'wine';
+    if (/blanco|marfil|rosa/.test(color)) return 'blush';
+    return 'charcoal';
   });
   private gesture?: { x: number; y: number };
 

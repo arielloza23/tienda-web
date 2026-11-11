@@ -7,8 +7,8 @@
   .showcase-media { min-width: 0; width: 100%; }
   .photo-expand { position: absolute; right: 13px; top: 17px; display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #ffffff80; border-radius: 50%; background: #20202080; color: #fff; font: inherit; font-size: 1.4rem; cursor: pointer; }
   .photo-thumbnails { display: flex; justify-content: center; flex-wrap: wrap; gap: 7px; margin: 0 0 8px; }
-  .photo-thumbnails button { width: 48px; height: 60px; overflow: hidden; padding: 2px; border: 1px solid #ffffff40; border-radius: 5px; background: transparent; cursor: pointer; }
-  .photo-thumbnails button.active { border-color: #fff; background: #ffffff40; }
+  .photo-thumbnails button { width: 48px; height: 60px; overflow: hidden; padding: 2px; border: 1px solid var(--showcase-line); border-radius: 5px; background: transparent; cursor: pointer; }
+  .photo-thumbnails button.active { border-color: var(--showcase-strong); background: var(--showcase-hover); }
   .photo-thumbnails img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 3px; }
   .photo-count { text-align: center; color: var(--showcase-muted); font-size: .6rem; margin: 0 0 8px; }
   .photo-empty { color: var(--showcase-muted); font-size: .8rem; text-align: center; }
