@@ -12,8 +12,9 @@ GitHub Actions** en el repositorio. El plan actual no admite Pages con este
 repositorio privado; hacerlo público requiere autorización del propietario.
 El workflow obtiene la ruta base de Pages y publica `dist/frontend/browser`.
 
-La API en Render ya responde, pero su catálogo está vacío: los productos de la
-base local todavía no están cargados en la base remota.
+La API en Render carga el producto inicial «Vestido body de encaje», color vino,
+talla M, a $15 mediante la migración `20261111_vestido_body`. Las cuatro fotos
+se publican desde `public/productos/vestido-body-de-encaje`.
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.5.
 

@@ -63,5 +63,38 @@ def test_upgrade_adopts_database_created_with_create_all(alembic_db) -> None:
 
     assert _schema_diff(engine) == []
     with engine.connect() as connection:
-        image_url = connection.execute(text("SELECT image_url FROM products")).scalar_one()
+        image_url = connection.execute(text(
+            "SELECT image_url FROM products WHERE slug = 'top-corse-encaje-negro'"
+        )).scalar_one()
     assert image_url.startswith("https://images.pexels.com/")
+
+
+def test_vestido_body_is_loaded_once_with_approved_price_and_photos(alembic_db):
+    config, engine = alembic_db
+    command.upgrade(config, "head")
+    command.upgrade(config, "head")
+    # Volver a aplicar después de retroceder tampoco duplica el catálogo.
+    command.downgrade(config, "20261108_product_gallery")
+    command.upgrade(config, "head")
+
+    with engine.connect() as connection:
+        product = connection.execute(text(
+            "SELECT id, price_cents, image_url, is_active FROM products "
+            "WHERE slug = 'vestido-body-de-encaje'"
+        )).mappings().one()
+        assert product["price_cents"] == 1500
+        assert product["is_active"]
+        assert product["image_url"].endswith("/vestido-body-de-encaje/portada.avif")
+        variant = connection.execute(text(
+            "SELECT size, color, price_adjustment_cents FROM product_variants "
+            "WHERE product_id = :id"
+        ), {"id": product["id"]}).one()
+        assert tuple(variant) == ("M", "Vino", 0)
+        photos = connection.execute(text(
+            "SELECT url, color FROM product_images WHERE product_id = :id ORDER BY position"
+        ), {"id": product["id"]}).all()
+        assert len(photos) == 3
+        assert all(photo.color == "Vino" for photo in photos)
+        assert [photo.url.rsplit("/", 1)[-1] for photo in photos] == [
+            "adicional-1.avif", "adicional-2.avif", "adicional-3.avif",
+        ]
