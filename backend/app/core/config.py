@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,15 @@ class Settings(BaseSettings):
     # Solo para desarrollo: con False, los endpoints de admin quedan abiertos.
     auth_enabled: bool = True
     cors_origins: list[str] = ["http://localhost:4200"]
+
+    @field_validator("database_url")
+    @classmethod
+    def use_psycopg_driver(cls, value: str) -> str:
+        # Render y Neon entregan URLs sin el nombre del driver instalado.
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                return "postgresql+psycopg://" + value[len(prefix):]
+        return value
 
     model_config = SettingsConfigDict(
         env_file=".env",

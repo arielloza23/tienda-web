@@ -39,6 +39,40 @@ alembic upgrade head   # crea o actualiza las tablas (la API ya no las crea al a
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+## Desplegar gratis en Render
+
+El archivo `render.yaml` en la raíz prepara un Web Service Free con Python
+3.13.18, autenticación activa, clave de firma generada por Render y comprobación
+en `/health`. Al arrancar aplica las migraciones antes de iniciar la API.
+
+1. En Render, conecta GitHub y permite acceso al repositorio privado
+   `arielloza23/tienda-web`.
+2. Elige **New > Blueprint**, selecciona el repositorio y la rama `master`.
+   Render leerá `render.yaml`.
+3. Introduce `DATABASE_URL`: la cadena PostgreSQL de una base externa, por
+   ejemplo Neon Free, con `sslmode=require`. Se aceptan los prefijos
+   `postgresql://`, `postgres://` y `postgresql+psycopg://`.
+   Introduce la contraseña solo en Render, nunca en GitHub ni en el chat.
+4. Confirma que el servicio usa **Free** y despliega. Verifica que `/health`
+   devuelve `status: ok` y que `/api/v1/products` responde correctamente.
+
+`CORS_ORIGINS` autoriza `https://arielloza23.github.io` (sin `/tienda-web`).
+Si cambia el dominio del frontend, actualiza esta variable como una lista JSON.
+La URL definitiva de la API se obtiene en Render tras crear el servicio;
+el frontend todavía necesita configurarse para usarla.
+
+El despliegue crea el esquema, pero no copia los productos, usuarios ni pedidos
+de la base local. La creación del primer administrador se hace con
+`python -m app.create_admin` desde un entorno local conectado a la base remota.
+
+No uses SQLite en Render Free: sus archivos locales se pierden al reiniciar.
+La base PostgreSQL gratuita de Render vence a los 30 días; este Blueprint no
+crea una base de datos de Render. El servidor Free se suspende tras 15 minutos
+sin tráfico y la primera petición puede tardar alrededor de un minuto.
+
+Referencias: [Render Free](https://render.com/docs/free),
+[Blueprints](https://render.com/docs/blueprint-spec).
+
 ## Base de datos
 
 La configuración por defecto usa PostgreSQL usando `DATABASE_URL` en `.env`. Para pruebas locales y desarrollo rápido, se puede usar SQLite cambiando esa variable (sin `.env` se usa `sqlite:///./tienda_web.db`).
