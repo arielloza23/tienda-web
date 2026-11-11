@@ -1,5 +1,20 @@
 # Frontend
 
+## API y publicación
+
+En desarrollo, `npm start` usa `/api/v1` a través de `proxy.conf.json`.
+La compilación de producción usa `https://tienda-web-api.onrender.com/api/v1`,
+configurado en `src/environments/environment.production.ts`.
+
+Para GitHub Pages, el workflow `Publicar tienda en GitHub Pages` está disponible
+en **Actions > Run workflow**. Primero hay que habilitar **Settings > Pages >
+GitHub Actions** en el repositorio. El plan actual no admite Pages con este
+repositorio privado; hacerlo público requiere autorización del propietario.
+El workflow obtiene la ruta base de Pages y publica `dist/frontend/browser`.
+
+La API en Render ya responde, pero su catálogo está vacío: los productos de la
+base local todavía no están cargados en la base remota.
+
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.5.
 
 ## Development server
