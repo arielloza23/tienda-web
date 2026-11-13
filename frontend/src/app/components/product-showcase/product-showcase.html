@@ -1,5 +1,5 @@
 <section class="showcase" [class.wine]="theme() === 'wine'" [class.blush]="theme() === 'blush'" [class.previous]="direction() === 'previous'"
-  role="region" aria-roledescription="carrusel" aria-label="Selección destacada de lencería">
+  role="region" aria-label="Producto destacado">
   <div class="showcase-topline"><span>LA COLECCIÓN · ENCAJE ESENCIAL</span><a href="#catalog">Ver todos los diseños <span aria-hidden="true">↗</span></a></div>
   @if (product(); as featured) {
     <div class="showcase-layout">
@@ -11,9 +11,14 @@
       </div>
 
       <div class="showcase-media">
-      <div class="showcase-stage" tabindex="0" aria-label="Galería del producto. Usa las flechas para ver sus fotos."
+      <div class="photo-gallery-heading">
+        <span>Fotos de este producto</span>
+        <span class="photo-position" aria-live="polite" aria-atomic="true">Foto {{ photos().length ? photoIndex() + 1 : 0 }} de {{ photos().length }}</span>
+      </div>
+      <div #photoStage class="showcase-stage" tabindex="0" role="group" [attr.aria-label]="'Fotos de ' + featured.name + '. Las flechas cambian solo sus fotos.'"
         (keydown.arrowleft)="movePhoto(-1); $event.preventDefault()" (keydown.arrowright)="movePhoto(1); $event.preventDefault()"
-        (pointerdown)="startGesture($event)" (pointerup)="finishGesture($event)">
+        (pointerdown)="startGesture($event)" (pointerup)="finishGesture($event)"
+        (pointercancel)="cancelGesture()" (lostpointercapture)="cancelGesture()">
         <span class="stage-word" aria-hidden="true">íntima</span>
         @for (photo of currentPhoto() ? [currentPhoto()!] : []; track photo.url) {
           <figure class="showcase-photo">
@@ -25,8 +30,8 @@
         @if (!currentPhoto()) { <p class="photo-empty">No hay fotos disponibles para este color.</p> }
         <div class="stage-shadow" aria-hidden="true"></div>
         @if (photos().length > 1) {
-          <button type="button" class="stage-arrow stage-arrow-prev" aria-label="Foto anterior" (click)="movePhoto(-1)">←</button>
-          <button type="button" class="stage-arrow stage-arrow-next" aria-label="Siguiente foto" (click)="movePhoto(1)">→</button>
+          <button type="button" class="stage-arrow stage-arrow-prev" aria-label="Foto anterior de este producto" [disabled]="photoIndex() === 0" (click)="movePhoto(-1)">←</button>
+          <button type="button" class="stage-arrow stage-arrow-next" aria-label="Siguiente foto de este producto" [disabled]="photoIndex() >= photos().length - 1" (click)="movePhoto(1)">→</button>
         }
       </div>
       @if (photos().length > 1) {
@@ -38,7 +43,7 @@
             </button>
           }
         </div>
-        <p class="photo-count">{{ photoIndex() + 1 }} / {{ photos().length }} fotos · {{ photoColor() }}</p>
+        <p class="photo-count"><span class="photo-swipe-hint">Desliza para ver sus fotos · </span>{{ photoColor() }}</p>
       }
       </div>
 
@@ -66,26 +71,27 @@
       </div>
     </div>
 
-    <div class="showcase-bottom">
-      <div class="showcase-navigation" aria-label="Navegar productos destacados">
-        <button type="button" class="showcase-arrow" aria-label="Producto anterior" [disabled]="products().length < 2" (click)="move(-1)">←</button>
-        <span class="showcase-counter"><b>{{ (index() + 1).toString().padStart(2, '0') }}</b><span> / {{ products().length.toString().padStart(2, '0') }}</span></span>
-        <button type="button" class="showcase-arrow" aria-label="Siguiente producto" [disabled]="products().length < 2" (click)="move(1)">→</button>
-      </div>
-      <div class="showcase-dots" role="group" aria-label="Elegir producto destacado">
-        @for (item of products(); track item.id; let i = $index) {
-          <button type="button" [class.active]="index() === i" [attr.aria-label]="'Ver ' + item.name" [attr.aria-pressed]="index() === i" (click)="goTo(i)"><span></span></button>
-        }
-      </div>
-      @if (nextProduct(); as next) {
-        @if (products().length > 1) {
-          <button type="button" class="showcase-next" (click)="move(1)" [attr.aria-label]="'Siguiente: ' + next.name">
-            <span><small>A CONTINUACIÓN</small>{{ next.name }} <b aria-hidden="true">↗</b></span>
-            @if (next.image_url) { <img [src]="next.image_url" alt="" width="44" height="54" /> }
+    @if (products().length > 1) {
+      <nav class="product-navigation" aria-label="Cambiar de producto">
+        <div class="product-navigation-heading">
+          <span>Explora otros productos</span>
+          <span aria-live="polite" aria-atomic="true">Producto {{ index() + 1 }} de {{ products().length }}</span>
+        </div>
+        <div class="product-navigation-actions">
+          <button type="button" class="product-step" [disabled]="!previousProduct()" (click)="move(-1)"
+            [attr.aria-label]="'Producto anterior' + (previousProduct() ? ': ' + previousProduct()!.name : '')">
+            <span class="product-step-arrow" aria-hidden="true">←</span>
+            <span class="product-step-copy"><span>Producto anterior</span><strong>{{ previousProduct()?.name || 'Estás en el primero' }}</strong></span>
           </button>
-        }
-      }
-    </div>
+          <button type="button" class="product-step product-step-next" [disabled]="!nextProduct()" (click)="move(1)"
+            [attr.aria-label]="'Siguiente producto' + (nextProduct() ? ': ' + nextProduct()!.name : '')">
+            @if (nextProduct()?.image_url; as nextImage) { <img [src]="nextImage" alt="" width="42" height="52" loading="lazy" /> }
+            <span class="product-step-copy"><span>Siguiente producto</span><strong>{{ nextProduct()?.name || 'Estás en el último' }}</strong></span>
+            <span class="product-step-arrow" aria-hidden="true">→</span>
+          </button>
+        </div>
+      </nav>
+    }
   } @else {
     <div class="showcase-empty"><p class="showcase-kicker">Lencería de encaje</p><h1>Tu esencia.<br /><em>Solo tuyo.</em></h1><a class="showcase-explore" href="#catalog">Explorar catálogo ↗</a></div>
   }
@@ -99,6 +105,6 @@
     <p>{{ photo.alt }} · {{ photoColor() }}</p>
   }
   @if (photos().length > 1) {
-    <div class="photo-dialog-controls"><button type="button" aria-label="Foto anterior" (click)="movePhoto(-1)">←</button><span>{{ photoIndex() + 1 }} / {{ photos().length }}</span><button type="button" aria-label="Siguiente foto" (click)="movePhoto(1)">→</button></div>
+    <div class="photo-dialog-controls"><button type="button" aria-label="Foto anterior" [disabled]="photoIndex() === 0" (click)="movePhoto(-1)">←</button><span>Foto {{ photoIndex() + 1 }} de {{ photos().length }}</span><button type="button" aria-label="Siguiente foto" [disabled]="photoIndex() >= photos().length - 1" (click)="movePhoto(1)">→</button></div>
   }
 </dialog>

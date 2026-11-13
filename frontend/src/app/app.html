@@ -211,8 +211,10 @@
         </dialog>
   <footer class="footer"><a class="footer-brand" href="#top">tienda web<span>Pequeños detalles. Muy tuyos.</span></a><a href="#catalog">Volver a la colección ↑</a><span>Ecuador · Precios en USD</span></footer>
   <div class="cart-feedback" role="status" aria-live="polite">{{ cartFeedback() }}</div>
+  @if (cartCount() > 0) {
   <button type="button" class="floating-cart" (click)="openCart()" aria-haspopup="dialog" [attr.aria-expanded]="cartOpen()" aria-controls="cart">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 7h14l1 14H4L5 7Z" /><path d="M8 8V6a4 4 0 0 1 8 0v2" /></svg>
     <span>Tu pedido <b>{{ cartCount() }}</b><small>{{ cartSubtotalCents() / 100 | currency: 'USD' }}</small></span><span aria-hidden="true">↗</span>
   </button>
+  }
 </div>

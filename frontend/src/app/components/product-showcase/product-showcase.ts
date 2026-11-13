@@ -16,7 +16,8 @@ export class ProductShowcase {
   protected readonly variantId = signal<number | null>(null);
   protected readonly direction = signal('next');
   protected readonly product = computed(() => this.products()[this.index() % (this.products().length || 1)]);
-  protected readonly nextProduct = computed(() => this.products()[(this.index() + 1) % this.products().length]);
+  protected readonly previousProduct = computed(() => this.products()[this.index() - 1]);
+  protected readonly nextProduct = computed(() => this.products()[this.index() + 1]);
   protected readonly selectedVariant = computed(() => this.product()?.variants.find((variant) => variant.id === this.variantId()) ?? null);
   protected readonly photoIndex = signal(0);
   protected readonly photoColor = computed(() => this.selectedVariant()?.color ?? this.product()?.variants[0]?.color ?? this.product()?.images?.[0]?.color ?? '');
@@ -33,6 +34,7 @@ export class ProductShowcase {
   });
   protected readonly currentPhoto = computed(() => this.photos()[this.photoIndex() % (this.photos().length || 1)]);
   private readonly photoDialog = viewChild.required<ElementRef<HTMLDialogElement>>('photoDialog');
+  private readonly photoStage = viewChild<ElementRef<HTMLElement>>('photoStage');
   protected readonly price = computed(() => (this.product()?.price_cents ?? 0) + (this.selectedVariant()?.price_adjustment_cents ?? 0));
   protected readonly theme = computed(() => {
     const color = this.photoColor().trim().toLocaleLowerCase();
@@ -40,7 +42,7 @@ export class ProductShowcase {
     if (/blanco|marfil|rosa/.test(color)) return 'blush';
     return 'charcoal';
   });
-  private gesture?: { x: number; y: number };
+  private gesture?: { x: number; y: number; pointerId: number };
 
   constructor() {
     effect(() => {
@@ -56,7 +58,7 @@ export class ProductShowcase {
 
   protected movePhoto(step: number): void {
     if (this.photos().length < 2) return;
-    this.photoIndex.update((index) => (index + step + this.photos().length) % this.photos().length);
+    this.photoIndex.update((index) => Math.max(0, Math.min(index + step, this.photos().length - 1)));
   }
 
   protected openPhoto(): void {
@@ -68,12 +70,16 @@ export class ProductShowcase {
   }
 
   protected move(step: number): void {
-    this.goTo((this.index() + step + this.products().length) % this.products().length);
-    this.direction.set(step > 0 ? 'next' : 'previous');
+    const index = this.index() + step;
+    if (index < 0 || index >= this.products().length) return;
+    this.goTo(index);
+    const stage = this.photoStage()?.nativeElement;
+    stage?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
+    stage?.focus({ preventScroll: true });
   }
 
   protected goTo(index: number): void {
-    if (index === this.index()) return;
+    if (index === this.index() || index < 0 || index >= this.products().length) return;
     this.direction.set(index > this.index() ? 'next' : 'previous');
     this.selectedProductId.set(this.products()[index].id);
     this.variantId.set(null);
@@ -86,17 +92,22 @@ export class ProductShowcase {
   }
 
   protected startGesture(event: PointerEvent): void {
-    this.gesture = { x: event.clientX, y: event.clientY };
+    if (!event.isPrimary || event.button !== 0 || (event.target as HTMLElement).closest('button, a')) return;
+    this.gesture = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
 
   protected finishGesture(event: PointerEvent): void {
-    if (!this.gesture) return;
+    if (!this.gesture || this.gesture.pointerId !== event.pointerId) return;
     const dx = event.clientX - this.gesture.x;
     const dy = event.clientY - this.gesture.y;
     this.gesture = undefined;
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.3) {
-      if (this.photos().length > 1) this.movePhoto(dx < 0 ? 1 : -1);
-      else this.move(dx < 0 ? 1 : -1);
+      this.movePhoto(dx < 0 ? 1 : -1);
     }
+  }
+
+  protected cancelGesture(): void {
+    this.gesture = undefined;
   }
 }
