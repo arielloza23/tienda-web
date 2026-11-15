@@ -80,3 +80,6 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 }
 @media (max-width: 360px) { .page-shell { padding-inline: 14px; } .brand-name { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+
+.account-link { border: 0; background: transparent; font: inherit; cursor: pointer; color: inherit; }
+@media (max-width: 600px) { .topbar-actions { flex-wrap: wrap; gap: .6rem; justify-content: flex-end; } .account-link { display: inline-block; font-size: .8rem; } }

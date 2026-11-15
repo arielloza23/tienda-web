@@ -1,6 +1,7 @@
 from typing import Optional
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.core.security import hash_password, verify_password
 from app.models.user import User, UserRole
@@ -31,7 +32,14 @@ def create_user(db: Session, payload: UserCreate, role: UserRole = UserRole.CUST
         is_active=True,
     )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+        if constraint == "ix_users_email" or "UNIQUE constraint failed: users.email" in str(exc.orig):
+            raise ValueError("Ya existe un usuario con ese correo electrónico.") from exc
+        raise
     db.refresh(user)
     return user
 

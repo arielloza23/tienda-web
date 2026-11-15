@@ -2,7 +2,7 @@
   <header class="admin-header">
     <div><p class="eyebrow">Tu tienda · Gestión</p><h1>Administración</h1></div>
     <nav aria-label="Administración"><a routerLink="/">Volver a la tienda</a>
-      @if (auth.user()) { <button type="button" class="button secondary" (click)="logout()" [disabled]="saving() || uploading()">Cerrar sesión</button> }
+      @if (auth.user()) { <button type="button" class="button secondary" (click)="logout()" [disabled]="busy()">Cerrar sesión</button> }
     </nav>
   </header>
   @if (error()) { <p class="notice error" role="alert">{{ error() }}</p> }
@@ -21,9 +21,10 @@
     <p class="signed-in">Sesión de <strong>{{ auth.user()?.full_name || auth.user()?.email }}</strong></p>
     <div class="workspace">
       <section class="panel" aria-labelledby="create-title">
-        <p class="eyebrow">Catálogo</p><h2 id="create-title">Crear producto</h2>
+        <p class="eyebrow">Catálogo</p><h2 id="create-title" #formTitle tabindex="-1">{{ editingId() === null ? 'Crear producto' : 'Editar producto' }}</h2>
+        @for (version of [formVersion()]; track version) {
         <form ngNativeValidate (ngSubmit)="saveProduct()" [attr.aria-busy]="saving() || uploading()">
-          <fieldset [disabled]="saving() || uploading()">
+          <fieldset [disabled]="busy()">
             <div class="fields two-columns">
               <div><label for="product-name">Nombre</label><input id="product-name" name="productName" [(ngModel)]="draft.name" (blur)="suggestSlug()" required minlength="2" maxlength="200"></div>
               <div><label for="product-slug">Identificador en la tienda</label><input id="product-slug" name="productSlug" [(ngModel)]="draft.slug" required minlength="2" maxlength="200" pattern="[a-z0-9]+(-[a-z0-9]+)*" aria-describedby="slug-help"><small id="slug-help">Letras minúsculas, números y guiones. Debe ser único.</small></div>
@@ -41,6 +42,7 @@
             </section>
             <section class="form-section" aria-labelledby="variants-title">
               <div class="section-heading"><div><h3 id="variants-title">Variantes</h3><p class="muted">Opciones de talla y color. El importe adicional se suma al precio base.</p></div><button type="button" class="button secondary" (click)="addVariant()" [disabled]="draft.variants.length >= 100">Agregar variante</button></div>
+              @if (editingId() !== null) { <p class="muted">Las variantes con pedidos no se pueden quitar. Para reutilizar un SKU, guárdalo primero con otro código libre.</p> }
               @for (variant of draft.variants; track variant; let i = $index) {
                 <div class="item-card"><div class="section-heading"><h4>Variante {{ i + 1 }}</h4><button type="button" class="text-button" (click)="removeVariant(i)" [attr.aria-label]="'Quitar variante ' + (i + 1)">Quitar</button></div>
                   <div class="fields two-columns">
@@ -70,17 +72,20 @@
                 </div>
               } @empty { <p class="empty">Agrega fotos para mostrar los detalles del producto.</p> }
             </section>
-            <button class="button primary submit-button" type="submit" [disabled]="loadingProducts()">{{ uploading() ? 'Subiendo foto…' : saving() ? 'Guardando producto…' : 'Crear producto' }}</button>
+            <button class="button primary submit-button" type="submit" [disabled]="loadingProducts()">{{ uploading() ? 'Subiendo foto…' : saving() ? 'Guardando producto…' : editingId() === null ? 'Crear producto' : 'Guardar cambios' }}</button>
+            @if (editingId() !== null) { <button type="button" class="button secondary" (click)="cancelEditing()">Cancelar edición</button> }
           </fieldset>
         </form>
+        }
       </section>
       <section class="panel catalog-panel" aria-labelledby="catalog-title" [attr.aria-busy]="loadingProducts()">
-        <div class="section-heading"><div><p class="eyebrow">Tu colección</p><h2 id="catalog-title">Productos</h2></div><button type="button" class="button secondary" (click)="loadProducts()" [disabled]="loadingProducts() || saving()">Actualizar</button></div>
+        <div class="section-heading"><div><p class="eyebrow">Tu colección</p><h2 id="catalog-title">Productos</h2></div><button type="button" class="button secondary" (click)="loadProducts()" [disabled]="busy()">Actualizar</button></div>
         @if (loadingProducts()) { <p class="empty" role="status">Cargando productos…</p> } @else {
           <ul class="product-list">@for (product of products(); track product.id) {
             <li class="product-row">
               @if (product.image_url) { <img [src]="product.image_url" [alt]="product.name" loading="lazy"> } @else { <div class="image-placeholder" aria-hidden="true">Sin foto</div> }
               <div class="product-info"><h3>{{ product.name }}</h3><p>{{ product.price_cents / 100 | currency:'USD':'symbol':'1.2-2' }}</p><span class="badge" [class.active]="product.is_active">{{ product.is_active ? 'Activo' : 'Borrador' }}</span></div>
+              <button type="button" class="button secondary" (click)="editProduct(product)" [disabled]="busy()" [attr.aria-pressed]="editingId() === product.id">Editar</button>
             </li>
           } @empty { <li class="empty">Todavía no hay productos. Crea el primero con el formulario.</li> }</ul>
         }

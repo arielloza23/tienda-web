@@ -1,10 +1,11 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, computed, effect, ElementRef, input, model, output, signal, viewChild } from '@angular/core';
+import { ProductReviews } from '../product-reviews/product-reviews';
 import { Product, ProductVariant } from '../../models/product.model';
 
 @Component({
   selector: 'app-product-showcase',
-  imports: [CurrencyPipe],
+  imports: [CurrencyPipe, ProductReviews],
   templateUrl: './product-showcase.html',
   styleUrl: './product-showcase.scss',
 })
@@ -54,6 +55,11 @@ export class ProductShowcase {
       this.photoColor();
       this.photoIndex.set(0);
     });
+  }
+
+  protected scrollCatalog(event: Event): void {
+    event.preventDefault();
+    document.getElementById('catalog')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
   }
 
   protected movePhoto(step: number): void {

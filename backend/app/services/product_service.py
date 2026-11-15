@@ -3,8 +3,9 @@ from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.models.order import OrderItem
 from app.models.product import Product, ProductImage, ProductVariant
-from app.schemas.product import ProductCreate
+from app.schemas.product import ProductCreate, ProductUpdate
 
 
 class ProductConflict(ValueError):
@@ -37,31 +38,50 @@ def create_product(db: Session, payload: ProductCreate) -> Product:
         image_url=payload.image_url,
     )
 
+    _validate_variants(db, payload)
+    product.variants = [ProductVariant(**variant.model_dump()) for variant in payload.variants]
+    product.images = _validated_images(payload)
+
+    db.add(product)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if _is_unique_conflict(exc):
+            raise ProductConflict("El identificador o SKU ya existe. Revisa el producto.") from exc
+        raise
+    db.refresh(product)
+    return product
+
+
+def _is_unique_conflict(exc: IntegrityError) -> bool:
+    constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+    message = str(exc.orig)
+    return constraint in {"ix_products_slug", "ix_product_variants_sku"} or (
+        "UNIQUE constraint failed: products.slug" in message
+        or "UNIQUE constraint failed: product_variants.sku" in message
+    )
+
+
+def _validate_variants(db: Session, payload: ProductCreate | ProductUpdate) -> None:
     seen_skus: set[str] = set()
-    for variant_data in payload.variants:
-        if variant_data.price_adjustment_cents < 0:
-            raise ValueError("El ajuste de precio de una variante no puede ser negativo.")
-        if variant_data.sku in seen_skus:
-            raise ProductConflict(f"La SKU {variant_data.sku} está duplicada.")
-        seen_skus.add(variant_data.sku)
-
-        existing_variant = db.query(ProductVariant).filter(ProductVariant.sku == variant_data.sku).first()
-        if existing_variant is not None:
-            raise ProductConflict(f"La SKU {variant_data.sku} ya existe.")
-
-        if payload.price_cents + variant_data.price_adjustment_cents > 2147483647:
-            raise ValueError("El precio de la variante excede el máximo permitido.")
-        product.variants.append(
-            ProductVariant(
-                sku=variant_data.sku,
-                size=variant_data.size,
-                color=variant_data.color,
-                price_adjustment_cents=variant_data.price_adjustment_cents,
+    for variant in payload.variants:
+        if variant.sku in seen_skus:
+            raise ProductConflict(f"La SKU {variant.sku} está duplicada.")
+        seen_skus.add(variant.sku)
+        existing = db.query(ProductVariant).filter(ProductVariant.sku == variant.sku).first()
+        if existing is not None and existing.id != getattr(variant, "id", None):
+            raise ProductConflict(
+                f"La SKU {variant.sku} ya existe. No se pueden intercambiar ni reutilizar SKU de otras variantes en el mismo guardado."
             )
-        )
+        if payload.price_cents + variant.price_adjustment_cents > 2147483647:
+            raise ValueError("El precio de la variante excede el máximo permitido.")
 
-    colors = {variant.color.strip().casefold(): variant.color.strip() for variant in payload.variants if variant.color and variant.color.strip()}
+
+def _validated_images(payload: ProductCreate | ProductUpdate) -> list[ProductImage]:
+    colors = {variant.color.casefold(): variant.color for variant in payload.variants if variant.color}
     seen_images: set[tuple[str, str]] = set()
+    images = []
     for position, image in enumerate(payload.images):
         color_key = image.color.casefold()
         if colors and color_key not in colors:
@@ -70,24 +90,57 @@ def create_product(db: Session, payload: ProductCreate) -> Product:
         if key in seen_images:
             raise ValueError("No repitas una foto para el mismo color.")
         seen_images.add(key)
-        product.images.append(ProductImage(
+        images.append(ProductImage(
             url=image.url, alt=image.alt, color=colors.get(color_key, image.color), position=position,
         ))
+    return images
 
-    db.add(product)
+
+def update_product(db: Session, product_id: int, payload: ProductUpdate) -> Product | None:
+    # Serializa ediciones del mismo producto en PostgreSQL, incluidos borradores.
+    product = db.query(Product).filter(Product.id == product_id).with_for_update().first()
+    if product is None:
+        return None
+    existing = db.query(Product).filter(Product.slug == payload.slug, Product.id != product_id).first()
+    if existing is not None:
+        raise ProductConflict("Ya existe un producto con ese identificador.")
+    current = {variant.id: variant for variant in product.variants}
+    retained_ids = {variant.id for variant in payload.variants if variant.id is not None}
+    if not retained_ids.issubset(current):
+        raise ValueError("Una variante no pertenece a este producto o ya no existe. Recarga el producto.")
+    omitted_ids = set(current) - retained_ids
+    if omitted_ids and db.query(OrderItem.id).filter(OrderItem.variant_id.in_(omitted_ids)).first() is not None:
+        raise ProductConflict("No se puede eliminar una variante usada en pedidos. Consérvala para mantener el historial.")
+    _validate_variants(db, payload)
+    images = _validated_images(payload)
+
+    # Ningún atributo persistente se cambia antes de completar todas las validaciones.
+    for field, value in payload.model_dump(exclude={"variants", "images"}).items():
+        setattr(product, field, value)
+    variants = []
+    for variant in payload.variants:
+        values = variant.model_dump(exclude={"id"})
+        if variant.id is None:
+            instance = ProductVariant(**values)
+        else:
+            instance = current[variant.id]
+            for field, value in values.items():
+                setattr(instance, field, value)
+        variants.append(instance)
+    product.variants = variants
+    product.images = images
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        # Solo traducir las restricciones únicas conocidas, también ante concurrencia.
-        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
-        message = str(exc.orig)
-        duplicate = constraint in {"ix_products_slug", "ix_product_variants_sku"} or (
-            "UNIQUE constraint failed: products.slug" in message
-            or "UNIQUE constraint failed: product_variants.sku" in message
-        )
-        if duplicate:
+        if _is_unique_conflict(exc):
             raise ProductConflict("El identificador o SKU ya existe. Revisa el producto.") from exc
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+        if omitted_ids and (
+            constraint in {"order_items_variant_id_fkey", "fk_order_items_variant_id_product_variants"}
+            or (db.get_bind().dialect.name == "sqlite" and "FOREIGN KEY constraint failed" in str(exc.orig))
+        ):
+            raise ProductConflict("No se puede eliminar una variante usada en pedidos. Recarga el producto.") from exc
         raise
     db.refresh(product)
     return product

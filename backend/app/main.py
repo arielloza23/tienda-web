@@ -7,6 +7,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.orders import router as orders_router
 from app.api.v1.products import router as products_router
 from app.api.v1.users import router as users_router
+from app.api.v1.reviews import router as reviews_router
 from app.core.config import settings
 
 app = FastAPI(
@@ -32,6 +33,7 @@ if not settings.auth_enabled:
 
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(products_router, prefix=settings.api_v1_prefix)
+app.include_router(reviews_router, prefix=settings.api_v1_prefix)
 app.include_router(users_router, prefix=settings.api_v1_prefix)
 app.include_router(orders_router, prefix=settings.api_v1_prefix)
 

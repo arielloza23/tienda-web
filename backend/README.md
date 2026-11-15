@@ -197,3 +197,49 @@ referencias a portadas y galería antes de eliminar objetos.
 Este cambio no requiere migraciones de tablas. Antes de publicarlo deben estar
 configurados el bucket y la cuenta administradora. Las pruebas automatizadas usan
 almacenamiento simulado y bases temporales, nunca las bases del usuario.
+
+
+### Editar productos existentes
+
+`PUT /api/v1/products/{product_id}` requiere un administrador autenticado y devuelve
+el producto actualizado. Envía los atributos del formulario completos, incluyendo
+`variants` e `images`; ambas listas son obligatorias y `[]` significa vaciarlas.
+Las variantes existentes deben incluir su `id`; las nuevas lo omiten. Se conservan
+los IDs y los importes y etiquetas históricos de los pedidos.
+
+Una variante vinculada a pedidos no se puede quitar: la API devuelve 409 sin
+aplicar ningún cambio. Los conflictos de identificador o SKU también devuelven
+409. No se intercambian SKU entre variantes en una misma petición; primero guarda
+un SKU libre. Quitar fotos del producto no borra los archivos del almacenamiento.
+No requiere migraciones. Las ediciones simultáneas conservan el último guardado.
+
+
+## Clientes y opiniones de productos
+
+El checkout sigue siendo público: `POST /api/v1/orders` acepta pedidos sin token
+ni cuenta, conserva la clave de reintento y no atribuye el pedido a un usuario.
+Iniciar sesión es necesario únicamente para publicar o actualizar opiniones.
+El registro (`POST /users`), acceso (`POST /auth/login`) y perfil (`GET /auth/me`)
+se reutilizan. El registro siempre crea clientes; no concede permisos de admin.
+
+- `GET /api/v1/products/{id}/reviews?limit=10&offset=0`: lectura pública de un
+  producto activo, devuelve `items`, `total`, `average_rating`, `limit`, `offset`.
+  El límite máximo es 50; la media contempla todas las calificaciones y es `null`
+  si todavía no hay votos.
+- `GET /api/v1/products/{id}/reviews/me`: opinión propia o `null`, con Bearer.
+- `PUT /api/v1/products/{id}/reviews/me`: crea o actualiza la opinión propia,
+  con `{ "rating": 5, "comment": "Comentario" }` y Bearer de usuario activo.
+  La calificación es un entero estricto de 1 a 5 y el comentario es opcional,
+  texto plano de hasta 2000 caracteres. No se exige compra previa.
+
+Una restricción única garantiza una opinión por cliente y producto; actualizarla
+no añade un segundo voto. El autor procede de la sesión y no del cuerpo recibido.
+La lectura pública solo muestra el nombre visible, estrellas, comentario y fechas;
+no publica correos ni identificadores de usuario. Los borradores no admiten
+reseñas públicas ni nuevas opiniones. Las cuentas inactivas no pueden publicar.
+
+La migración `20261115_product_reviews` agrega `product_reviews` y sus restricciones,
+sin modificar pedidos o productos existentes. Se valida en bases temporales.
+Antes de publicar hay que respaldar la base y ejecutar `alembic upgrade head`.
+Un downgrade de esta revisión elimina las reseñas; no se usa sobre datos reales
+como mecanismo de prueba. Moderación y verificación de correo no están incluidas.

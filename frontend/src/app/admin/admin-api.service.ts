@@ -10,6 +10,9 @@ export interface ProductCreate {
   variants: Array<{ sku: string; size: string | null; color: string | null; price_adjustment_cents: number }>;
   images: Array<{ url: string; alt: string; color: string }>;
 }
+export interface ProductUpdate extends Omit<ProductCreate, 'variants'> {
+  variants: Array<ProductCreate['variants'][number] & { id?: number | null }>;
+}
 @Injectable({ providedIn: 'root' })
 export class AdminApi {
   private readonly http = inject(HttpClient);
@@ -25,6 +28,9 @@ export class AdminApi {
   }
   create(product: ProductCreate): Observable<Product> {
     return this.authorized(this.http.post<Product>(`${environment.apiBaseUrl}/products`, product, { headers: this.auth.headers() }));
+  }
+  update(id: number, product: ProductUpdate): Observable<Product> {
+    return this.authorized(this.http.put<Product>(`${environment.apiBaseUrl}/products/${id}`, product, { headers: this.auth.headers() }));
   }
   upload(file: File): Observable<{ url: string }> {
     const body = new FormData(); body.append('file', file);

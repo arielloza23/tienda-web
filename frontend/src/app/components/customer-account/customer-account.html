@@ -1,0 +1,25 @@
+<dialog #dialog aria-label="Mi cuenta" (cancel)="close()" (close)="close()" (click)="dismissBackdrop($event)">
+  <button type="button" class="close" aria-label="Cerrar mi cuenta" (click)="close()">×</button>
+  <h2>Mi cuenta</h2>
+  @if (auth.user(); as user) {
+    <p>Hola, {{ user.full_name }}.</p><p>Tu sesión te permite comentar y calificar productos.</p>
+    <button type="button" (click)="auth.logout(); notice.set('Sesión cerrada.')">Cerrar sesión</button>
+  } @else {
+    <p>Puedes comprar sin crear una cuenta.</p>
+    <h3>{{ signup() ? 'Crear cuenta' : 'Iniciar sesión' }}</h3>
+    <form (ngSubmit)="submit()">
+      <fieldset [disabled]="busy()">
+        @if (signup()) {
+          <label>Nombre visible<input name="full_name" [(ngModel)]="fullName" required minlength="2" maxlength="200" autocomplete="nickname" /></label>
+          <small>Este nombre aparecerá públicamente junto a tus opiniones.</small>
+        }
+        <label>Correo electrónico<input type="email" name="email" [(ngModel)]="email" required maxlength="320" autocomplete="email" /></label>
+        <label>Contraseña<input type="password" name="password" [(ngModel)]="password" required [minlength]="signup() ? 8 : 1" maxlength="128" [autocomplete]="signup() ? 'new-password' : 'current-password'" /></label>
+        <button type="submit">{{ busy() ? 'Procesando…' : signup() ? 'Registrarme' : 'Iniciar sesión' }}</button>
+        <button type="button" class="secondary" (click)="changeMode()">{{ signup() ? 'Ya tengo cuenta' : 'Crear cuenta' }}</button>
+      </fieldset>
+    </form>
+  }
+  @if (error()) { <p role="alert">{{ error() }}</p> }
+  @if (notice()) { <p role="status">{{ notice() }}</p> }
+</dialog>

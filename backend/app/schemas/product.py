@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ProductVariantBase(BaseModel):
@@ -14,6 +14,10 @@ class ProductVariantBase(BaseModel):
 
 class ProductVariantCreate(ProductVariantBase):
     model_config = ConfigDict(extra="forbid")
+
+
+class ProductVariantUpdate(ProductVariantCreate):
+    id: int | None = Field(default=None, strict=True, gt=0)
 
 
 class ProductVariantRead(ProductVariantBase):
@@ -52,6 +56,20 @@ class ProductCreate(ProductBase):
     images: list[ProductImageCreate] = Field(default_factory=list, max_length=12)
 
     model_config = ConfigDict(extra="forbid")
+
+
+class ProductUpdate(ProductBase):
+    variants: list[ProductVariantUpdate] = Field(max_length=100)
+    images: list[ProductImageCreate] = Field(max_length=12)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def unique_variant_ids(self):
+        ids = [variant.id for variant in self.variants if variant.id is not None]
+        if len(ids) != len(set(ids)):
+            raise ValueError("No repitas el ID de una variante.")
+        return self
 
 
 class ProductRead(ProductBase):

@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { emptyProductDraft, priceToCents, productRequest } from './product-form';
+import { emptyProductDraft, priceToCents, productRequest, productToDraft, productUpdateRequest } from './product-form';
 
 describe('Product form', () => {
+  it('copies editable products without mutating them and retains IDs only for updates', () => {
+    const product = { id: 7, name: 'Body', slug: 'body-vino', price_cents: 2147483647, is_active: false,
+      image_url: 'https://cdn.example/cover.webp',
+      variants: [{ id: 23, sku: 'BODY-M', size: 'M', color: 'Vino', price_adjustment_cents: 0 }],
+      images: [{ id: 8, url: 'https://cdn.example/front.webp', alt: 'Vista frontal', color: 'Vino' }] };
+    const draft = productToDraft(product);
+    expect(draft.price).toBe('21474836.47');
+    expect(draft.variants[0].adjustment).toBe('0.00');
+    expect(productUpdateRequest(draft).variants[0].id).toBe(23);
+    expect(productRequest(draft).variants[0]).not.toHaveProperty('id');
+    draft.variants.push({ sku: 'BODY-L', size: 'L', color: 'Vino', adjustment: '0.00' });
+    expect(productUpdateRequest(draft).variants[1]).not.toHaveProperty('id');
+    draft.variants[0].sku = 'BODY-NEW'; draft.images[0].alt = 'Detalle';
+    expect(product.variants[0].sku).toBe('BODY-M'); expect(product.images[0].alt).toBe('Vista frontal');
+  });
   it('converts dollars exactly without rounding invalid precision', () => {
     expect(priceToCents('15,29')).toBe(1529);
     expect(priceToCents('0.10')).toBe(10);

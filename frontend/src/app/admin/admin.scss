@@ -47,3 +47,9 @@ button:disabled,fieldset:disabled .button { cursor:wait; opacity:.55; } .order-a
 .badge.active { background:#e6eedc; color:#3e562c; } .empty { color:#62665b; font-size:14px; line-height:1.6; padding:16px 0; }
 @media(max-width:1000px) { .workspace { grid-template-columns:minmax(0,1fr); } }
 @media(max-width:600px) { .admin-header { align-items:flex-start; flex-direction:column; } .admin-header nav { gap:14px; font-size:13px; } .two-columns { grid-template-columns:minmax(0,1fr); } .panel { padding:20px 16px; } .section-heading { align-items:flex-start; } .login-panel { margin:28px auto; } .item-card { padding:12px; } .product-row { gap:12px; } }
+
+.product-row { display:grid; grid-template-columns:76px minmax(0,1fr); }
+.product-row > img,.product-row > .image-placeholder { grid-row:1 / span 2; }
+.product-row > button { grid-column:2; justify-self:start; }
+#create-title:focus-visible { outline:3px solid #74845b; outline-offset:4px; }
+.submit-button + .secondary { margin-top:12px; width:100%; }

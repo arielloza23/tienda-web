@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, Injector, OnInit, afterNextRender, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -9,7 +9,7 @@ import { finalize } from 'rxjs';
 import { Product } from '../models/product.model';
 import { AdminAuth } from './auth.service';
 import { AdminApi } from './admin-api.service';
-import { emptyProductDraft, productRequest } from './product-form';
+import { emptyProductDraft, productRequest, productToDraft, productUpdateRequest } from './product-form';
 
 @Component({ imports: [CommonModule, FormsModule, RouterLink], templateUrl: './admin.html', styleUrl: './admin.scss' })
 export class Admin implements OnInit {
@@ -26,6 +26,26 @@ export class Admin implements OnInit {
   protected readonly success = signal('');
   protected readonly products = signal<Product[]>([]);
   protected draft = emptyProductDraft();
+  protected readonly editingId = signal<number | null>(null);
+  protected readonly formVersion = signal(0);
+  private readonly formTitle = viewChild<ElementRef<HTMLHeadingElement>>('formTitle');
+  private readonly injector = inject(Injector);
+  protected busy(): boolean { return this.saving() || this.uploading() || this.loadingProducts(); }
+  private resetEditor(): void {
+    this.editingId.set(null); this.draft = emptyProductDraft(); this.formVersion.update((version) => version + 1);
+  }
+  private focusEditor(): void {
+    afterNextRender(() => this.formTitle()?.nativeElement.focus(), { injector: this.injector });
+  }
+  protected editProduct(product: Product): void {
+    if (this.busy()) return;
+    this.draft = productToDraft(product); this.editingId.set(product.id);
+    this.formVersion.update((version) => version + 1); this.error.set(''); this.success.set(''); this.focusEditor();
+  }
+  protected cancelEditing(): void {
+    if (this.busy()) return;
+    this.resetEditor(); this.error.set(''); this.success.set(''); this.focusEditor();
+  }
 
   ngOnInit(): void { if (this.auth.user()) this.loadProducts(); }
   protected login(): void {
@@ -36,11 +56,11 @@ export class Admin implements OnInit {
     })).subscribe({ next: () => this.loadProducts(), error: (error) => this.showError(error) });
   }
   protected logout(): void {
-    if (this.saving() || this.uploading()) return;
-    this.auth.logout(); this.products.set([]); this.draft = emptyProductDraft(); this.error.set(''); this.success.set('');
+    if (this.busy()) return;
+    this.auth.logout(); this.products.set([]); this.resetEditor(); this.error.set(''); this.success.set('');
   }
   protected loadProducts(): void {
-    if (!this.auth.user() || this.loadingProducts() || this.saving()) return;
+    if (!this.auth.user() || this.busy()) return;
     this.loadingProducts.set(true);
     this.api.list().pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.loadingProducts.set(false))).subscribe({
       next: (products) => this.products.set(products), error: (error) => this.showError(error),
@@ -67,7 +87,7 @@ export class Admin implements OnInit {
   }
   private upload(event: Event, accept: (url: string) => void): void {
     const input = event.target as HTMLInputElement; const file = input.files?.[0]; input.value = '';
-    if (!file || this.uploading() || this.saving() || !this.auth.user()) return;
+    if (!file || this.busy() || !this.auth.user()) return;
     if (file.size > 8 * 1024 * 1024) { this.error.set('La foto debe pesar como máximo 8 MiB.'); return; }
     this.error.set(''); this.success.set(''); this.uploading.set(true);
     this.api.upload(file).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.uploading.set(false))).subscribe({
@@ -78,10 +98,15 @@ export class Admin implements OnInit {
     if (this.saving() || this.uploading() || this.loadingProducts() || !this.auth.user()) return;
     this.error.set(''); this.success.set('');
     try {
-      const request = productRequest(this.draft);
+      const editingId = this.editingId();
+      const operation = editingId === null ? this.api.create(productRequest(this.draft)) : this.api.update(editingId, productUpdateRequest(this.draft));
       this.saving.set(true);
-      this.api.create(request).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.saving.set(false))).subscribe({
-        next: (product) => { this.products.update((products) => [product, ...products]); this.draft = emptyProductDraft(); this.success.set(`Producto «${product.name}» creado como ${product.is_active ? 'activo' : 'borrador'}.`); },
+      operation.pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.saving.set(false))).subscribe({
+        next: (product) => {
+          this.products.update((products) => editingId === null ? [product, ...products] : products.map((entry) => entry.id === product.id ? product : entry));
+          this.resetEditor(); this.success.set(`Producto «${product.name}» ${editingId === null ? 'creado' : 'actualizado'} como ${product.is_active ? 'activo' : 'borrador'}.`);
+          this.focusEditor();
+        },
         error: (error) => this.showError(error),
       });
     } catch (error) { this.showError(error); }

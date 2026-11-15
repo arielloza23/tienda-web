@@ -30,6 +30,17 @@ describe('Admin access', () => {
     expect(auth.user()).toBeNull();
     expect(() => auth.headers()).toThrow();
   });
+  it('updates products with authenticated PUT and preserves variant IDs', () => {
+    authenticate();
+    const product = { name: 'Body', slug: 'body-vino', description: null, price_cents: 1500, is_active: true, image_url: null,
+      variants: [{ id: 23, sku: 'BODY-M', size: 'M', color: 'Vino', price_adjustment_cents: 50 }], images: [] };
+    TestBed.inject(AdminApi).update(7, product).subscribe();
+    const request = http.expectOne((r) => r.url.endsWith('/products/7'));
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer secret-test-token');
+    expect(request.request.body.variants[0].id).toBe(23);
+    request.flush({ ...product, id: 7 });
+  });
   it('uploads multipart files without setting content type manually', () => {
     authenticate();
     TestBed.inject(AdminApi).upload(new File(['photo'], 'photo.png', { type: 'image/png' })).subscribe();

@@ -143,3 +143,38 @@ def test_idempotency_migration_preserves_existing_orders(alembic_db):
     with engine.connect() as connection:
         assert connection.execute(text("SELECT total_cents FROM orders WHERE id=900")).scalar_one() == 100
     command.upgrade(config, "head")
+
+
+
+def test_reviews_migration_preserves_existing_data_and_constraints(alembic_db):
+    from sqlalchemy.exc import IntegrityError
+    config, engine = alembic_db
+    command.upgrade(config, "20261115_order_idempotency")
+    with engine.begin() as connection:
+        product_id = connection.execute(text("SELECT id FROM products ORDER BY id LIMIT 1")).scalar_one()
+        connection.execute(text("INSERT INTO users (id, email, full_name, password_hash, role, is_active) VALUES (800, 'migration@example.com', 'Temporal', 'fake', 'customer', 1)"))
+        connection.execute(text("INSERT INTO orders (id, status, subtotal_cents, total_cents, shipping_total_cents, tax_total_cents, created_at) VALUES (800, 'pending', 700, 700, 0, 0, CURRENT_TIMESTAMP)"))
+        product_count = connection.execute(text("SELECT COUNT(*) FROM products")).scalar_one()
+    command.upgrade(config, "head")
+    statement = text("INSERT INTO product_reviews (product_id, user_id, rating, comment, created_at, updated_at) VALUES (:product_id, 800, :rating, '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+    with engine.begin() as connection:
+        connection.execute(statement, {"product_id": product_id, "rating": 5})
+    for rating in [5, 0, 6]:
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(statement, {"product_id": product_id, "rating": rating})
+    # Check validation independently of uniqueness.
+    with engine.begin() as connection:
+        connection.execute(text("DELETE FROM product_reviews"))
+    for rating in [0, 6]:
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(statement, {"product_id": product_id, "rating": rating})
+    command.downgrade(config, "20261115_order_idempotency")
+    assert "product_reviews" not in inspect(engine).get_table_names()
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT COUNT(*) FROM products")).scalar_one() == product_count
+        assert connection.execute(text("SELECT email FROM users WHERE id=800")).scalar_one() == 'migration@example.com'
+        assert connection.execute(text("SELECT total_cents FROM orders WHERE id=800")).scalar_one() == 700
+    command.upgrade(config, "head")
+    assert _schema_diff(engine) == []

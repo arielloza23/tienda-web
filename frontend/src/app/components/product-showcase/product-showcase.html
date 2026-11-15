@@ -1,13 +1,13 @@
 <section class="showcase" [class.wine]="theme() === 'wine'" [class.blush]="theme() === 'blush'" [class.previous]="direction() === 'previous'"
   role="region" aria-label="Producto destacado">
-  <div class="showcase-topline"><span>LA COLECCIÓN · ENCAJE ESENCIAL</span><a href="#catalog">Ver todos los diseños <span aria-hidden="true">↗</span></a></div>
+  <div class="showcase-topline"><span>LA COLECCIÓN · ENCAJE ESENCIAL</span><a href="#catalog" (click)="scrollCatalog($event)">Ver todos los diseños <span aria-hidden="true">↗</span></a></div>
   @if (product(); as featured) {
     <div class="showcase-layout">
       <div class="showcase-copy">
         <p class="showcase-kicker"><span></span> Un detalle. Todo cambia.</p>
         <h1>Tu esencia.<br /> Tu estilo.<br /><em>Solo tuyo.</em></h1>
         <p class="showcase-intro">Piezas que se sienten tan bien<br />como se ven. Encuentra la tuya.</p>
-        <a class="showcase-explore" href="#catalog">Descubrir la colección <span aria-hidden="true">↗</span></a>
+        <a class="showcase-explore" href="#catalog" (click)="scrollCatalog($event)">Descubrir la colección <span aria-hidden="true">↗</span></a>
       </div>
 
       <div class="showcase-media">
@@ -92,8 +92,9 @@
         </div>
       </nav>
     }
+    <app-product-reviews [productId]="featured.id" />
   } @else {
-    <div class="showcase-empty"><p class="showcase-kicker">Lencería de encaje</p><h1>Tu esencia.<br /><em>Solo tuyo.</em></h1><a class="showcase-explore" href="#catalog">Explorar catálogo ↗</a></div>
+    <div class="showcase-empty"><p class="showcase-kicker">Lencería de encaje</p><h1>Tu esencia.<br /><em>Solo tuyo.</em></h1><a class="showcase-explore" href="#catalog" (click)="scrollCatalog($event)">Explorar catálogo ↗</a></div>
   }
 </section>
 <dialog #photoDialog class="photo-dialog" aria-label="Foto ampliada del producto"

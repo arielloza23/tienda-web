@@ -8,6 +8,7 @@
     <nav class="topbar-actions" aria-label="Navegación principal">
       <a class="nav-link" href="#catalog" (click)="scrollToSection($event, 'catalog')">Catálogo</a>
       <a class="nav-link how-link" href="#how-it-works" (click)="scrollToSection($event, 'how-it-works')">Cómo comprar</a>
+      <button type="button" class="nav-link account-link" (click)="customerAuth.open()" aria-haspopup="dialog">Mi cuenta</button>
       <button type="button" class="cart-link" (click)="openCart()" aria-haspopup="dialog">
         Tu pedido <span class="cart-count">{{ cartCount() }}</span>
       </button>
@@ -66,7 +67,7 @@
           <div class="cart-heading">
             <div>
               <p class="cart-eyebrow">Elegido por ti</p>
-              <h2 id="cart-title">Tu pedido</h2>
+              <h2 id="cart-title">Tu pedido</h2><p>Puedes comprar sin crear una cuenta.</p>
             </div>
             <span class="cart-count">{{ cartCount() }}</span>
             <button type="button" class="cart-close" aria-label="Cerrar pedido" (click)="closeCart()">×</button>
@@ -223,3 +224,5 @@
   </button>
   }
 </div>
+
+<app-customer-account />

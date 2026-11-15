@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin, require_authenticated_admin
 from app.db.session import get_db
-from app.schemas.product import ProductCreate, ProductRead
-from app.services.product_service import ProductConflict, create_product, get_admin_products, get_product_by_id, get_products
+from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
+from app.services.product_service import ProductConflict, create_product, get_admin_products, get_product_by_id, get_products, update_product
 from app.services.image_service import MAX_UPLOAD_BYTES, ImageStorageError, upload_product_image
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -56,3 +56,16 @@ def create_new_product(payload: ProductCreate, db: Session = Depends(get_db)) ->
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.put("/{product_id}", response_model=ProductRead, dependencies=[Depends(require_authenticated_admin)])
+def edit_product(product_id: int, payload: ProductUpdate, db: Session = Depends(get_db)) -> ProductRead:
+    try:
+        product = update_product(db, product_id, payload)
+    except ProductConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if product is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado.")
+    return product

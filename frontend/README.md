@@ -111,3 +111,34 @@ La prueba usa Chrome instalado en Windows, los puertos 8123/8124, una base
 SQLite en memoria y almacenamiento simulado. No llama a producción ni crea
 productos reales. Comprueba login, carga de archivos, creación completa,
 borradores, navegación de la tienda, disposición móvil y cierre de sesión.
+
+
+Desde la lista del administrador, pulsa **Editar** para cargar un producto,
+cambiar sus atributos y fotos y **Guardar cambios**. **Cancelar edición** vuelve
+al formulario de creación sin modificar el producto. Si falla el guardado se
+conservan los datos ingresados. Las variantes vinculadas a pedidos no pueden
+quitarse y las imágenes existentes se conservan sin volver a subirlas.
+
+
+## Compra invitada y opiniones
+
+La compra no requiere iniciar sesión ni crear una cuenta. **Mi cuenta** permite
+registrarse o entrar para calificar con 1 a 5 estrellas y comentar el producto
+seleccionado. Cada cuenta tiene una opinión por producto, que puede actualizar.
+Las reseñas son públicas y muestran el nombre visible elegido al registrarse.
+El comentario es texto plano de hasta 2000 caracteres y puede dejarse vacío.
+
+La sesión de cliente y la administrativa son independientes. El token solo vive
+en memoria; al recargar se necesita entrar de nuevo. El carrito y los pedidos
+no reciben tokens de autenticación. Las respuestas antiguas de reseñas se cancelan
+al cambiar de producto para evitar mezclar opiniones.
+
+Después de compilar, se puede comprobar el flujo con Chrome y datos temporales:
+
+```powershell
+.\.venv\Scripts\python.exe frontend/tests/customer_browser.py
+```
+
+La prueba realiza una compra invitada, registro, acceso, publicación y actualización
+de una opinión, lectura pública, cambio de producto y vista móvil. Usa API local,
+SQLite en memoria y respuestas simuladas para servicios externos; no toca producción.

@@ -1,8 +1,9 @@
-import { ProductCreate } from './admin-api.service';
+import { Product } from '../models/product.model';
+import { ProductCreate, ProductUpdate } from './admin-api.service';
 
 export interface ProductDraft {
   name: string; slug: string; description: string; price: string; is_active: boolean; coverUrl: string;
-  variants: Array<{ sku: string; size: string; color: string; adjustment: string }>;
+  variants: Array<{ id?: number; sku: string; size: string; color: string; adjustment: string }>;
   images: Array<{ url: string; alt: string; color: string }>;
 }
 export function emptyProductDraft(): ProductDraft {
@@ -47,4 +48,24 @@ export function productRequest(draft: ProductDraft): ProductCreate {
   if (draft.coverUrl && !draft.coverUrl.startsWith('https://')) throw new Error('La portada debe ser una foto subida correctamente.');
   return { name: draft.name.trim(), slug: draft.slug.trim(), description: draft.description.trim() || null,
     price_cents: price, is_active: draft.is_active, image_url: draft.coverUrl || null, variants, images };
+}
+
+function centsToPrice(cents: number): string {
+  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
+}
+export function productToDraft(product: Product): ProductDraft {
+  return {
+    name: product.name, slug: product.slug, description: product.description || '',
+    price: centsToPrice(product.price_cents), is_active: product.is_active, coverUrl: product.image_url || '',
+    variants: product.variants.map((variant) => ({ id: variant.id, sku: variant.sku,
+      size: variant.size || '', color: variant.color || '', adjustment: centsToPrice(variant.price_adjustment_cents) })),
+    images: (product.images || []).map(({ url, alt, color }) => ({ url, alt, color })),
+  };
+}
+export function productUpdateRequest(draft: ProductDraft): ProductUpdate {
+  const request = productRequest(draft);
+  return { ...request, variants: request.variants.map((variant, index) => {
+    const id = draft.variants[index].id;
+    return id === undefined ? variant : { ...variant, id };
+  }) };
 }

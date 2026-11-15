@@ -105,12 +105,49 @@ try:
             created = db.scalars(select(Product).where(Product.slug == "body-de-prueba")).one()
             assert created.price_cents == 1550 and not created.is_active
             assert created.variants[0].price_adjustment_cents == 200 and created.images[0].color == "Vino"
+            original_id = created.id
+            original_variant_id = created.variants[0].id
+            original_cover = created.image_url
+            original_photo = created.images[0].url
+        row = page.locator("li.product-row").filter(has_text="Body de prueba")
+        row.get_by_role("button", name="Editar", exact=True).click()
+        expect(page.get_by_role("heading", name="Editar producto", exact=True)).to_be_visible()
+        expect(page.get_by_label("Nombre", exact=True)).to_have_value("Body de prueba")
+        expect(page.get_by_label("Precio base (USD)")).to_have_value("15.50")
+        expect(page.locator(".gallery-preview")).to_be_visible()
+        page.get_by_label("Nombre", exact=True).fill("Cambio sin guardar")
+        page.get_by_role("button", name="Cancelar edición", exact=True).click()
+        expect(page.get_by_role("heading", name="Crear producto", exact=True)).to_be_visible()
+        expect(row).to_contain_text("Body de prueba")
+        row.get_by_role("button", name="Editar", exact=True).click()
+        page.get_by_label("Nombre", exact=True).fill("Body actualizado")
+        page.get_by_label("Precio base (USD)").fill("18,75")
+        page.get_by_label("Talla", exact=True).fill("L")
+        page.get_by_label("Publicar como producto activo").check()
+        # Error del servidor: no perder la edición ni mutar el listado.
+        update_route = "**/api/v1/products/" + str(original_id)
+        page.route(update_route, lambda route: route.fulfill(status=409, content_type="application/json", body='{"detail":"Conflicto de prueba"}'))
+        page.get_by_role("button", name="Guardar cambios", exact=True).click()
+        expect(page.get_by_role("alert")).to_contain_text("Conflicto de prueba")
+        expect(page.get_by_label("Nombre", exact=True)).to_have_value("Body actualizado")
+        expect(row).to_contain_text("Body de prueba")
+        page.unroute(update_route)
+        page.get_by_role("button", name="Guardar cambios", exact=True).click()
+        expect(page.get_by_role("status")).to_contain_text("actualizado")
+        expect(page.get_by_role("heading", name="Crear producto", exact=True)).to_be_visible()
+        expect(page.locator("li.product-row").filter(has_text="Body actualizado")).to_have_count(1)
+        assert len(writes) == 2  # Las fotos existentes no se vuelven a subir.
+        with sessions() as db:
+            edited = db.get(Product, original_id)
+            assert edited.name == "Body actualizado" and edited.price_cents == 1875 and edited.is_active
+            assert edited.variants[0].id == original_variant_id and edited.variants[0].size == "L"
+            assert edited.image_url == original_cover and edited.images[0].url == original_photo
         assert not any(value in page.evaluate("JSON.stringify(localStorage)") for value in ("access_token", "Bearer", "test-password-123"))
         page.get_by_role("link", name="Volver a la tienda").click()
         expect(page.locator(".topbar")).to_be_visible()
         page.get_by_role("link", name="Catálogo", exact=True).click()
         assert page.url.endswith("/#/")
-        expect(page.locator(".product-miniature")).to_have_count(1)
+        expect(page.locator(".product-miniature")).to_have_count(2)
         page.get_by_role("link", name="Administración", exact=True).click()
         expect(page.get_by_role("heading", name="Crear producto", exact=True)).to_be_visible()
         page.set_viewport_size({"width": 390, "height": 844})
@@ -119,7 +156,7 @@ try:
         expect(page.get_by_role("button", name="Iniciar sesión")).to_be_visible()
         assert not errors, errors
         browser.close()
-        print("BROWSER_OK: admin login, two file uploads, full product attributes, draft privacy, hash links, mobile layout, logout.")
+        print("BROWSER_OK: admin login, two file uploads, product creation and editing, cancel, conflict recovery, preserved variants/photos, hash links, mobile layout, logout.")
 finally:
     server.should_exit = True; static.shutdown(); static.server_close()
     for thread in threads: thread.join(timeout=10)

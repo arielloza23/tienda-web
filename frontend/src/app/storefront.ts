@@ -12,15 +12,18 @@ import { OrderCreateRequest, OrderReceipt } from './models/order.model';
 import { CartService } from './services/cart.service';
 import { OrderService } from './services/order.service';
 import { ProductService } from './services/product.service';
+import { CustomerAccount } from './components/customer-account/customer-account';
+import { CustomerAuth } from './services/customer-auth.service';
 import { STORE_CONFIG } from './store-config';
 
 @Component({
-  imports: [CommonModule, CurrencyPipe, FormsModule, RouterLink, DeliveryMap, ProductShowcase],
+  imports: [CommonModule, CurrencyPipe, FormsModule, RouterLink, DeliveryMap, ProductShowcase, CustomerAccount],
   selector: 'app-storefront',
   styleUrl: './app.scss',
   templateUrl: './app.html',
 })
 export class Storefront implements OnInit {
+  protected readonly customerAuth = inject(CustomerAuth);
   private feedbackTimeout?: ReturnType<typeof setTimeout>;
   private readonly productService = inject(ProductService);
   private readonly orderService = inject(OrderService);
