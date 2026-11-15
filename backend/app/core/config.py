@@ -1,5 +1,7 @@
 from typing import Literal
 
+from pydantic import SecretStr
+
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +16,12 @@ class Settings(BaseSettings):
     # Solo para desarrollo: con False, los endpoints de admin quedan abiertos.
     auth_enabled: bool = True
     cors_origins: list[str] = ["http://localhost:4200"]
+    aws_endpoint_url_s3: str | None = None
+    aws_region: str = "us-east-1"
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: SecretStr | None = None
+    product_images_bucket: str | None = None
+    product_images_public_url: str | None = None
 
     @field_validator("database_url")
     @classmethod

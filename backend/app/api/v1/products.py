@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin
+from app.api.deps import require_admin, require_authenticated_admin
 from app.db.session import get_db
 from app.schemas.product import ProductCreate, ProductRead
-from app.services.product_service import create_product, get_product_by_id, get_products
+from app.services.product_service import ProductConflict, create_product, get_admin_products, get_product_by_id, get_products
+from app.services.image_service import MAX_UPLOAD_BYTES, ImageStorageError, upload_product_image
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -12,6 +13,26 @@ router = APIRouter(prefix="/products", tags=["products"])
 @router.get("", response_model=list[ProductRead])
 def list_products(db: Session = Depends(get_db)) -> list[ProductRead]:
     return get_products(db)
+
+
+@router.get("/admin", response_model=list[ProductRead], dependencies=[Depends(require_authenticated_admin)])
+def list_admin_products(db: Session = Depends(get_db)) -> list[ProductRead]:
+    return get_admin_products(db)
+
+
+@router.post("/images", status_code=201, dependencies=[Depends(require_authenticated_admin)])
+def upload_image(file: UploadFile = File(...)) -> dict[str, str]:
+    try:
+        content = file.file.read(MAX_UPLOAD_BYTES + 1)
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="La foto debe pesar como máximo 8 MiB.")
+        return {"url": upload_product_image(content)}
+    except ImageStorageError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    finally:
+        file.file.close()
 
 
 @router.get("/{product_id}", response_model=ProductRead)
@@ -31,5 +52,7 @@ def read_product(product_id: int, db: Session = Depends(get_db)) -> ProductRead:
 def create_new_product(payload: ProductCreate, db: Session = Depends(get_db)) -> ProductRead:
     try:
         return create_product(db, payload)
+    except ProductConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

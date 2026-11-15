@@ -1,13 +1,13 @@
 <div class="page-shell">
-  <a class="skip-link" href="#catalog">Ir al catálogo</a>
+  <a class="skip-link" href="#catalog" (click)="scrollToSection($event, 'catalog')">Ir al catálogo</a>
   <div class="announcement">Detalles que se sienten. Diseños que te acompañan. <span>Ecuador · USD</span></div>
   <header class="topbar">
-    <a class="brand" href="#top" aria-label="Tienda Web, inicio">
+    <a class="brand" href="#top" aria-label="Tienda Web, inicio" (click)="scrollToSection($event, 'top')">
       <span class="brand-symbol" aria-hidden="true">tw.</span><span class="brand-name">TIENDA WEB<small>LENCERÍA &amp; ESENCIA</small></span>
     </a>
     <nav class="topbar-actions" aria-label="Navegación principal">
-      <a class="nav-link" href="#catalog">Catálogo</a>
-      <a class="nav-link how-link" href="#how-it-works">Cómo comprar</a>
+      <a class="nav-link" href="#catalog" (click)="scrollToSection($event, 'catalog')">Catálogo</a>
+      <a class="nav-link how-link" href="#how-it-works" (click)="scrollToSection($event, 'how-it-works')">Cómo comprar</a>
       <button type="button" class="cart-link" (click)="openCart()" aria-haspopup="dialog">
         Tu pedido <span class="cart-count">{{ cartCount() }}</span>
       </button>
@@ -93,7 +93,7 @@
               <button type="button" class="clear-cart" (click)="startNewOrder(); closeCart()">Volver al catálogo</button>
             </section>
           } @else if (cart().length === 0) {
-            <div class="empty-cart"><span class="empty-cart-symbol" aria-hidden="true">＋</span><h3>Un espacio para tus favoritos.</h3><p>Elige una pieza y tu talla. Aquí empieza tu próximo pedido.</p><a href="#catalog" (click)="closeCart()">Explorar la colección ↗</a></div>
+            <div class="empty-cart"><span class="empty-cart-symbol" aria-hidden="true">＋</span><h3>Un espacio para tus favoritos.</h3><p>Elige una pieza y tu talla. Aquí empieza tu próximo pedido.</p><a href="#catalog" (click)="scrollToSection($event, 'catalog'); closeCart()">Explorar la colección ↗</a></div>
           } @else {
             @if (cartNotice()) { <p class="checkout-note" role="status">{{ cartNotice() }}</p> }
             <ul class="cart-list">
@@ -214,7 +214,7 @@
             <button type="button" class="clear-cart" [disabled]="isSubmittingOrder()" (click)="clearCart()">Vaciar pedido</button>
           }
         </dialog>
-  <footer class="footer"><a class="footer-brand" href="#top">tienda web<span>Pequeños detalles. Muy tuyos.</span></a><a href="#catalog">Volver a la colección ↑</a><span>Ecuador · Precios en USD</span></footer>
+  <footer class="footer"><a class="footer-brand" href="#top" (click)="scrollToSection($event, 'top')">tienda web<span>Pequeños detalles. Muy tuyos.</span></a><a href="#catalog" (click)="scrollToSection($event, 'catalog')">Volver a la colección ↑</a><a routerLink="/admin">Administración</a><span>Ecuador · Precios en USD</span></footer>
   <div class="cart-feedback" role="status" aria-live="polite">{{ cartFeedback() }}</div>
   @if (cartCount() > 0) {
   <button type="button" class="floating-cart" (click)="openCart()" aria-haspopup="dialog" [attr.aria-expanded]="cartOpen()" aria-controls="cart">

@@ -142,3 +142,58 @@ La revisión `20261115_order_idempotency` añade columnas opcionales y un índic
 existente, respaldarla y aplicar `alembic upgrade head`. El downgrade conserva
 los pedidos, pero elimina sus claves e historial de reintentos. La validación
 local usa bases temporales; no aplicar migraciones sobre bases reales como prueba.
+
+
+## Módulo de administración de productos
+
+La interfaz está en `/#/admin` (en Pages, `/tienda-web/#/admin`). Permite iniciar
+sesión con un administrador, crear productos activos o borradores, agregar sus
+variantes, subir portada y hasta 12 fotos de galería, y ordenar las fotos.
+El precio base y los ajustes se muestran en USD; la API recibe centavos enteros.
+No incorpora stock ni crea cuentas administrativas desde el navegador.
+
+- `GET /api/v1/products/admin`: listado privado con activos e inactivos.
+- `POST /api/v1/products`: creación con sus atributos y variantes.
+- `POST /api/v1/products/images`: carga multipart con campo `file`, requiere
+  un administrador autenticado incluso si el bypass de desarrollo está activo.
+- El identificador del producto y los SKU deben ser únicos; los conflictos
+  devuelven 409. Los IDs y las posiciones de fotos son gestionados por el servidor.
+
+Para crear el primer administrador, usa el comando existente desde `backend`,
+con el entorno apuntando a la base correcta (no pegues contraseñas en comandos):
+
+```powershell
+..\.venv\Scripts\python.exe -m app.create_admin TU_CORREO "TU NOMBRE"
+```
+
+La contraseña se pide de forma interactiva. No hay una contraseña predeterminada.
+El navegador mantiene el token solo en memoria; recargar requiere iniciar sesión.
+
+### Fotos persistentes
+
+Configura en el entorno del backend, mediante su gestor de secretos:
+
+- `AWS_ENDPOINT_URL_S3`: endpoint HTTPS de la rama de Neon Object Storage.
+- `AWS_REGION`: región del almacenamiento.
+- `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`: credencial con permiso de escritura.
+- `PRODUCT_IMAGES_BUCKET`: bucket con lectura pública y escritura autenticada.
+- `PRODUCT_IMAGES_PUBLIC_URL`: URL HTTPS base pública del bucket, sin barra final.
+  Puede ser un CDN. Se agrega a esa base la clave `products/<uuid>.webp`.
+
+Las credenciales S3 se usan únicamente en el servidor. No guardar la conexión o
+claves en el frontend, Git o la documentación. No se configura ACL por objeto;
+configura el acceso público en el bucket. Ningún archivo depende del disco efímero
+de Render. Sin configuración, la carga devuelve 503, sin simular un éxito.
+
+Se aceptan JPEG, PNG, WebP y AVIF hasta 8 MiB y 20 megapíxeles. El servidor
+comprueba el contenido, rechaza animaciones, orienta la foto, elimina metadatos
+(incluido GPS), reduce a un máximo de 2400 píxeles por lado y convierte a WebP.
+Las claves son nuevas por cada carga; las respuestas se pueden almacenar en caché.
+
+Subir una foto y abandonar el formulario puede dejar un objeto sin producto.
+No se borran automáticamente fotos: cualquier limpieza futura debe comprobar
+referencias a portadas y galería antes de eliminar objetos.
+
+Este cambio no requiere migraciones de tablas. Antes de publicarlo deben estar
+configurados el bucket y la cuenta administradora. Las pruebas automatizadas usan
+almacenamiento simulado y bases temporales, nunca las bases del usuario.

@@ -32,6 +32,12 @@ def get_current_user(
     return user
 
 
+def require_authenticated_admin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != UserRole.ADMIN.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere una cuenta administradora.")
+    return current_user
+
+
 def require_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),

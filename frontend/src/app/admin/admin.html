@@ -1,0 +1,90 @@
+<div class="admin-page">
+  <header class="admin-header">
+    <div><p class="eyebrow">Tu tienda · Gestión</p><h1>Administración</h1></div>
+    <nav aria-label="Administración"><a routerLink="/">Volver a la tienda</a>
+      @if (auth.user()) { <button type="button" class="button secondary" (click)="logout()" [disabled]="saving() || uploading()">Cerrar sesión</button> }
+    </nav>
+  </header>
+  @if (error()) { <p class="notice error" role="alert">{{ error() }}</p> }
+  @if (success()) { <p class="notice success" role="status">{{ success() }}</p> }
+  @if (!auth.user()) {
+    <section class="panel login-panel" aria-labelledby="login-title">
+      <p class="eyebrow">Acceso privado</p><h2 id="login-title">Entra a tu administración</h2>
+      <p class="muted">Usa tu cuenta de administrador para gestionar el catálogo.</p>
+      <form ngNativeValidate (ngSubmit)="login()"><fieldset [disabled]="loggingIn()">
+        <label for="login-email">Correo electrónico</label><input id="login-email" name="loginEmail" type="email" autocomplete="username" [(ngModel)]="loginEmail" required maxlength="254">
+        <label for="login-password">Contraseña</label><input id="login-password" name="loginPassword" type="password" autocomplete="current-password" [(ngModel)]="loginPassword" required maxlength="128">
+        <button class="button primary" type="submit" [attr.aria-busy]="loggingIn()">{{ loggingIn() ? 'Entrando…' : 'Iniciar sesión' }}</button>
+      </fieldset></form>
+    </section>
+  } @else {
+    <p class="signed-in">Sesión de <strong>{{ auth.user()?.full_name || auth.user()?.email }}</strong></p>
+    <div class="workspace">
+      <section class="panel" aria-labelledby="create-title">
+        <p class="eyebrow">Catálogo</p><h2 id="create-title">Crear producto</h2>
+        <form ngNativeValidate (ngSubmit)="saveProduct()" [attr.aria-busy]="saving() || uploading()">
+          <fieldset [disabled]="saving() || uploading()">
+            <div class="fields two-columns">
+              <div><label for="product-name">Nombre</label><input id="product-name" name="productName" [(ngModel)]="draft.name" (blur)="suggestSlug()" required minlength="2" maxlength="200"></div>
+              <div><label for="product-slug">Identificador en la tienda</label><input id="product-slug" name="productSlug" [(ngModel)]="draft.slug" required minlength="2" maxlength="200" pattern="[a-z0-9]+(-[a-z0-9]+)*" aria-describedby="slug-help"><small id="slug-help">Letras minúsculas, números y guiones. Debe ser único.</small></div>
+            </div>
+            <label for="product-description">Descripción</label><textarea id="product-description" name="productDescription" [(ngModel)]="draft.description" rows="5" maxlength="5000"></textarea>
+            <div class="fields two-columns">
+              <div><label for="product-price">Precio base (USD)</label><input id="product-price" name="productPrice" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" [(ngModel)]="draft.price" required aria-describedby="price-help"><small id="price-help">Desde 0, con un máximo de dos decimales. Ej.: 15,50.</small></div>
+              <label class="checkbox"><input name="productActive" type="checkbox" [(ngModel)]="draft.is_active"> Publicar como producto activo</label>
+            </div>
+            <section class="form-section" aria-labelledby="cover-title">
+              <h3 id="cover-title">Foto de portada</h3><label for="cover-file">Seleccionar una foto del equipo</label>
+              <input id="cover-file" name="coverFile" type="file" accept="image/jpeg,image/png,image/webp,image/avif" (change)="uploadCover($event)" aria-describedby="photo-help">
+              <small id="photo-help">JPEG, PNG, WebP o AVIF. Máximo 8 MiB y 20 megapíxeles por foto.</small>
+              @if (draft.coverUrl) { <div class="cover-preview"><img [src]="draft.coverUrl" [alt]="draft.name || 'Vista previa de portada'"><button type="button" class="button secondary" (click)="clearCover()">Quitar portada</button></div> }
+            </section>
+            <section class="form-section" aria-labelledby="variants-title">
+              <div class="section-heading"><div><h3 id="variants-title">Variantes</h3><p class="muted">Opciones de talla y color. El importe adicional se suma al precio base.</p></div><button type="button" class="button secondary" (click)="addVariant()" [disabled]="draft.variants.length >= 100">Agregar variante</button></div>
+              @for (variant of draft.variants; track variant; let i = $index) {
+                <div class="item-card"><div class="section-heading"><h4>Variante {{ i + 1 }}</h4><button type="button" class="text-button" (click)="removeVariant(i)" [attr.aria-label]="'Quitar variante ' + (i + 1)">Quitar</button></div>
+                  <div class="fields two-columns">
+                    <div><label [for]="'sku-' + i">SKU único</label><input [id]="'sku-' + i" [name]="'sku-' + i" [(ngModel)]="variant.sku" required minlength="3" maxlength="100"></div>
+                    <div><label [for]="'size-' + i">Talla</label><input [id]="'size-' + i" [name]="'size-' + i" [(ngModel)]="variant.size" maxlength="50"></div>
+                    <div><label [for]="'color-' + i">Color</label><input [id]="'color-' + i" [name]="'color-' + i" [(ngModel)]="variant.color" maxlength="50"></div>
+                    <div><label [for]="'adjustment-' + i">Importe adicional (USD)</label><input [id]="'adjustment-' + i" [name]="'adjustment-' + i" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" [(ngModel)]="variant.adjustment" required></div>
+                  </div>
+                </div>
+              } @empty { <p class="empty">Sin variantes: se venderá como un producto simple.</p> }
+            </section>
+            <section class="form-section" aria-labelledby="gallery-title">
+              <div class="section-heading"><div><h3 id="gallery-title">Galería</h3><p class="muted">{{ draft.images.length }} de 12 fotos. El orden se conserva en la tienda.</p></div><button type="button" class="button secondary" (click)="addImage()" [disabled]="draft.images.length >= 12">Agregar foto</button></div>
+              @for (image of draft.images; track image; let i = $index) {
+                <div class="item-card"><div class="section-heading"><h4>Foto {{ i + 1 }}</h4><div class="order-actions">
+                  <button type="button" class="text-button" (click)="moveImage(i, -1)" [disabled]="i === 0" [attr.aria-label]="'Subir foto ' + (i + 1)">Subir</button>
+                  <button type="button" class="text-button" (click)="moveImage(i, 1)" [disabled]="i === draft.images.length - 1" [attr.aria-label]="'Bajar foto ' + (i + 1)">Bajar</button>
+                  <button type="button" class="text-button" (click)="removeImage(i)" [attr.aria-label]="'Quitar foto ' + (i + 1)">Quitar</button>
+                </div></div>
+                  @if (image.url) { <img class="gallery-preview" [src]="image.url" [alt]="image.alt || 'Vista previa de foto ' + (i + 1)"> }
+                  <label [for]="'gallery-file-' + i">Seleccionar foto del equipo</label><input [id]="'gallery-file-' + i" [name]="'gallery-file-' + i" type="file" accept="image/jpeg,image/png,image/webp,image/avif" (change)="uploadGallery($event, i)">
+                  <label [for]="'image-alt-' + i">Descripción de la foto</label><input [id]="'image-alt-' + i" [name]="'image-alt-' + i" [(ngModel)]="image.alt" required minlength="2" maxlength="200" placeholder="Ej.: vista frontal del body vino">
+                  <label [for]="'image-color-' + i">Color asociado</label>
+                  @if (galleryColors().length) {
+                    <select [id]="'image-color-' + i" [name]="'image-color-' + i" [(ngModel)]="image.color" required><option value="" disabled>Selecciona un color</option>@for (color of galleryColors(); track color) { <option [value]="color">{{ color }}</option> }</select>
+                  } @else { <input [id]="'image-color-' + i" [name]="'image-color-' + i" [(ngModel)]="image.color" required maxlength="50" placeholder="Ej.: Único"> }
+                </div>
+              } @empty { <p class="empty">Agrega fotos para mostrar los detalles del producto.</p> }
+            </section>
+            <button class="button primary submit-button" type="submit" [disabled]="loadingProducts()">{{ uploading() ? 'Subiendo foto…' : saving() ? 'Guardando producto…' : 'Crear producto' }}</button>
+          </fieldset>
+        </form>
+      </section>
+      <section class="panel catalog-panel" aria-labelledby="catalog-title" [attr.aria-busy]="loadingProducts()">
+        <div class="section-heading"><div><p class="eyebrow">Tu colección</p><h2 id="catalog-title">Productos</h2></div><button type="button" class="button secondary" (click)="loadProducts()" [disabled]="loadingProducts() || saving()">Actualizar</button></div>
+        @if (loadingProducts()) { <p class="empty" role="status">Cargando productos…</p> } @else {
+          <ul class="product-list">@for (product of products(); track product.id) {
+            <li class="product-row">
+              @if (product.image_url) { <img [src]="product.image_url" [alt]="product.name" loading="lazy"> } @else { <div class="image-placeholder" aria-hidden="true">Sin foto</div> }
+              <div class="product-info"><h3>{{ product.name }}</h3><p>{{ product.price_cents / 100 | currency:'USD':'symbol':'1.2-2' }}</p><span class="badge" [class.active]="product.is_active">{{ product.is_active ? 'Activo' : 'Borrador' }}</span></div>
+            </li>
+          } @empty { <li class="empty">Todavía no hay productos. Crea el primero con el formulario.</li> }</ul>
+        }
+      </section>
+    </div>
+  }
+</div>

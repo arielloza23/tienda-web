@@ -86,3 +86,28 @@ Nombre, teléfono, dirección y coordenadas se mantienen en memoria.
 La clave del intento de checkout se conserva en memoria tras un error de red;
 recargar la página reinicia ese intento. Ante una respuesta incierta, conviene
 reintentar sin recargar ni cambiar los datos para recuperar el mismo pedido.
+
+
+## Administración
+
+Abre `http://localhost:4200/#/admin` para iniciar sesión y crear productos.
+Las rutas usan hash para permitir recargar la administración en GitHub Pages.
+La tienda conserva su catálogo y carrito en la ruta principal.
+
+Los productos incluyen nombre, identificador, descripción, precio USD, estado,
+portada, variantes (SKU, talla, color y ajuste de precio) y galería ordenada por
+color. Las fotos se seleccionan desde el equipo y se envían al backend autenticado.
+Consulta `backend/README.md` para configurar almacenamiento y crear el primer admin.
+
+La verificación de navegador se puede repetir después de `npm run build`, desde
+la raíz, con `..` ajustado a la ubicación de tu entorno Python:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install playwright
+.\.venv\Scripts\python.exe frontend/tests/admin_browser.py
+```
+
+La prueba usa Chrome instalado en Windows, los puertos 8123/8124, una base
+SQLite en memoria y almacenamiento simulado. No llama a producción ni crea
+productos reales. Comprueba login, carga de archivos, creación completa,
+borradores, navegación de la tienda, disposición móvil y cierre de sesión.
