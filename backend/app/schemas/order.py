@@ -9,7 +9,7 @@ from app.models.order import OrderStatus
 class OrderItemCreate(BaseModel):
     product_id: int = Field(..., gt=0)
     variant_id: Optional[int] = Field(default=None, gt=0)
-    quantity: int = Field(..., gt=0)
+    quantity: int = Field(..., gt=0, le=100, strict=True)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -28,13 +28,14 @@ class OrderItemRead(BaseModel):
 
 
 class OrderCreate(BaseModel):
-    user_id: Optional[int] = Field(default=None, gt=0)
+    # El checkout público no acepta atribuciones a cuentas del cliente.
+    user_id: None = None
     customer_name: str = Field(..., min_length=2, max_length=200)
     customer_phone: str = Field(..., min_length=7, max_length=30)
     delivery_address: str = Field(..., min_length=8, max_length=500)
     delivery_latitude: Optional[float] = Field(default=None, ge=-90, le=90)
     delivery_longitude: Optional[float] = Field(default=None, ge=-180, le=180)
-    items: list[OrderItemCreate] = Field(..., min_length=1)
+    items: list[OrderItemCreate] = Field(..., min_length=1, max_length=50)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -42,6 +43,12 @@ class OrderCreate(BaseModel):
     def check_coordinates_pair(self) -> "OrderCreate":
         if (self.delivery_latitude is None) != (self.delivery_longitude is None):
             raise ValueError("Envía latitud y longitud juntas, o ninguna.")
+        quantities: dict[tuple[int, int | None], int] = {}
+        for item in self.items:
+            key = (item.product_id, item.variant_id)
+            quantities[key] = quantities.get(key, 0) + item.quantity
+            if quantities[key] > 100:
+                raise ValueError("Máximo 100 unidades de la misma variante por pedido.")
         return self
 
 

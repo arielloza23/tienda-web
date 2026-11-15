@@ -43,6 +43,7 @@ const LOCATED_ZOOM = 17;
 })
 export class DeliveryMap {
   readonly location = input<DeliveryLocation | null>(null);
+  readonly disabled = input(false);
   readonly locationChange = output<DeliveryLocation | null>();
   readonly addressChange = output<string>();
   readonly addressLoadingChange = output<boolean>();
@@ -105,8 +106,11 @@ export class DeliveryMap {
     // Mantiene el pin sincronizado con el valor que recibe del formulario.
     effect(() => {
       const location = this.location();
+      const disabled = this.disabled();
       if (this.mapReady()) {
         this.syncMarker(location);
+        if (disabled) this.marker?.dragging?.disable();
+        else this.marker?.dragging?.enable();
       }
     });
 
@@ -117,6 +121,7 @@ export class DeliveryMap {
   }
 
   protected useCurrentLocation(): void {
+    if (this.disabled()) return;
     if (!('geolocation' in navigator)) {
       this.geolocationError.set('Tu navegador no permite obtener la ubicación.');
       return;
@@ -127,6 +132,7 @@ export class DeliveryMap {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         this.isLocating.set(false);
+        if (this.disabled()) return;
         const latLng = L.latLng(position.coords.latitude, position.coords.longitude);
         this.map?.setView(latLng, LOCATED_ZOOM);
         this.emitLocation(latLng);
@@ -144,12 +150,14 @@ export class DeliveryMap {
   }
 
   protected markMapCenter(): void {
+    if (this.disabled()) return;
     if (this.map) {
       this.emitLocation(this.map.getCenter());
     }
   }
 
   protected clearLocation(): void {
+    if (this.disabled()) return;
     this.addressRequests.next(null);
     this.setAddressLoading(false);
     this.addressError.set(null);
@@ -158,6 +166,7 @@ export class DeliveryMap {
   }
 
   protected selectCity(name: string): void {
+    if (this.disabled()) return;
     const city = this.cities.find((entry) => entry.name === name);
     this.selectedCity.set(name);
     this.clearLocation();
@@ -228,6 +237,7 @@ export class DeliveryMap {
   }
 
   private emitLocation(latLng: L.LatLng): void {
+    if (this.disabled()) return;
     const wrapped = latLng.wrap();
     this.geolocationError.set(null);
     this.locationChange.emit({

@@ -73,3 +73,16 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+
+## Validación de la tienda
+
+- `npm run build`: compilación de producción.
+- `npm test -- --watch=false`: pruebas Angular/Vitest del carrito y los reintentos.
+
+El carrito guarda en `localStorage` únicamente IDs de producto/variante y
+cantidades. Al cargar el catálogo vuelve a obtener precios y disponibilidad.
+Nombre, teléfono, dirección y coordenadas se mantienen en memoria.
+La clave del intento de checkout se conserva en memoria tras un error de red;
+recargar la página reinicia ese intento. Ante una respuesta incierta, conviene
+reintentar sin recargar ni cambiar los datos para recuperar el mismo pedido.

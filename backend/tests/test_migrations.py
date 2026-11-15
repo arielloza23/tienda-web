@@ -127,3 +127,19 @@ def test_conjunto_encaje_is_loaded_once_with_approved_price_and_photos(alembic_d
         assert [photo.url.rsplit("/", 1)[-1] for photo in photos] == [
             "adicional-1.avif", "adicional-2.avif", "adicional-3.avif", "adicional-4.avif",
         ]
+
+
+def test_idempotency_migration_preserves_existing_orders(alembic_db):
+    from alembic import command
+    config, engine = alembic_db
+    command.upgrade(config, "20261111_conjunto_encaje")
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO orders (id, status, subtotal_cents, total_cents, shipping_total_cents, tax_total_cents, created_at) VALUES (900, 'pending', 100, 100, 0, 0, CURRENT_TIMESTAMP)"))
+    command.upgrade(config, "head")
+    with engine.connect() as connection:
+        row = connection.execute(text("SELECT total_cents, idempotency_key, request_hash FROM orders WHERE id=900")).one()
+        assert tuple(row) == (100, None, None)
+    command.downgrade(config, "20261111_conjunto_encaje")
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT total_cents FROM orders WHERE id=900")).scalar_one() == 100
+    command.upgrade(config, "head")

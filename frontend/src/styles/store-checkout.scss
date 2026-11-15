@@ -63,3 +63,5 @@
 @media (prefers-reduced-motion: reduce) { .cart-panel[open] { animation: none; } }
 
 }
+
+.checkout-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: contents; }

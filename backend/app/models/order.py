@@ -28,6 +28,8 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, unique=True, index=True)
+    request_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     customer_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     customer_phone: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)

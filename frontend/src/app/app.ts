@@ -8,6 +8,7 @@ import { DeliveryMap } from './components/delivery-map/delivery-map';
 import { ProductShowcase } from './components/product-showcase/product-showcase';
 import { CartItem, Product, ProductVariant } from './models/product.model';
 import { OrderCreateRequest, OrderReceipt } from './models/order.model';
+import { CartService } from './services/cart.service';
 import { OrderService } from './services/order.service';
 import { ProductService } from './services/product.service';
 import { STORE_CONFIG } from './store-config';
@@ -22,6 +23,7 @@ export class App implements OnInit {
   private feedbackTimeout?: ReturnType<typeof setTimeout>;
   private readonly productService = inject(ProductService);
   private readonly orderService = inject(OrderService);
+  private readonly cartService = inject(CartService);
   private readonly whatsappPhone = STORE_CONFIG.whatsappPhone.replace(/\D/g, '');
   private readonly fallbackProductImage =
     'https://images.pexels.com/photos/33114806/pexels-photo-33114806.jpeg?auto=compress&cs=tinysrgb&w=900';
@@ -38,7 +40,8 @@ export class App implements OnInit {
   protected readonly visibleProducts = computed(() => this.activeColor() === 'Todos'
     ? this.products()
     : this.products().filter((product) => product.variants.some((variant) => variant.color?.trim() === this.activeColor())));
-  protected readonly cart = signal<CartItem[]>([]);
+  protected readonly cart = this.cartService.items;
+  protected readonly cartNotice = this.cartService.notice;
   protected readonly isLoading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly customerName = signal('');
@@ -51,12 +54,8 @@ export class App implements OnInit {
   protected readonly orderConfirmation = signal<OrderReceipt | null>(null);
   protected readonly whatsappFollowupUrl = signal<string | null>(null);
 
-  protected readonly cartCount = computed(() =>
-    this.cart().reduce((count, item) => count + item.quantity, 0),
-  );
-  protected readonly cartSubtotalCents = computed(() =>
-    this.cart().reduce((total, item) => total + this.unitPriceCents(item) * item.quantity, 0),
-  );
+  protected readonly cartCount = this.cartService.count;
+  protected readonly cartSubtotalCents = this.cartService.subtotalCents;
   constructor() {
     inject(DestroyRef).onDestroy(() => clearTimeout(this.feedbackTimeout));
   }
@@ -71,6 +70,7 @@ export class App implements OnInit {
     this.productService.getProducts().subscribe({
       next: (products) => {
         this.products.set(products);
+        this.cartService.reconcile(products);
         this.isLoading.set(false);
       },
       error: () => {
@@ -109,55 +109,31 @@ export class App implements OnInit {
 
   protected addToCart(product: Product, variant: ProductVariant | null = null): void {
     if (this.orderConfirmation()) this.startNewOrder();
-    this.cart.update((items) => {
-      const existing = items.find((item) => this.isSameCartLine(item, product, variant));
-      if (existing) {
-        return items.map((item) =>
-          this.isSameCartLine(item, product, variant)
-            ? { ...item, quantity: item.quantity + 1 }
-            : item,
-        );
-      }
-
-      return [...items, { product, variant, quantity: 1 }];
-    });
+    if (this.isSubmittingOrder()) return;
+    if (!this.cartService.add(product, variant)) {
+      this.cartFeedback.set(this.cartNotice());
+      return;
+    }
     clearTimeout(this.feedbackTimeout);
     this.cartFeedback.set(`${product.name}${variant?.size ? ', talla ' + variant.size : ''} añadido. ${this.cartCount()} ${this.cartCount() === 1 ? 'unidad' : 'unidades'} en tu pedido.`);
     this.feedbackTimeout = setTimeout(() => this.cartFeedback.set(''), 3500);
   }
 
-  protected increaseQuantity(itemToChange: CartItem): void {
-    this.cart.update((items) =>
-      items.map((item) =>
-        this.isSameCartLine(item, itemToChange.product, itemToChange.variant)
-          ? { ...item, quantity: item.quantity + 1 }
-          : item,
-      ),
-    );
+  protected increaseQuantity(item: CartItem): void {
+    if (!this.isSubmittingOrder()) this.cartService.add(item.product, item.variant);
   }
 
-  protected decreaseQuantity(itemToChange: CartItem): void {
-    this.cart.update((items) =>
-      items.flatMap((item) => {
-        if (!this.isSameCartLine(item, itemToChange.product, itemToChange.variant)) {
-          return [item];
-        }
-        return item.quantity > 1 ? [{ ...item, quantity: item.quantity - 1 }] : [];
-      }),
-    );
+  protected decreaseQuantity(item: CartItem): void {
+    if (!this.isSubmittingOrder()) this.cartService.decrease(item);
   }
 
-  protected removeFromCart(itemToRemove: CartItem): void {
-    this.cart.update((items) =>
-      items.filter(
-        (item) => !this.isSameCartLine(item, itemToRemove.product, itemToRemove.variant),
-      ),
-    );
+  protected removeFromCart(item: CartItem): void {
+    if (!this.isSubmittingOrder()) this.cartService.remove(item);
   }
 
   protected clearCart(): void {
-    this.cart.set([]);
-    this.isLookingUpAddress.set(false);
+    if (this.isSubmittingOrder()) return;
+    this.cartService.clear();
     this.checkoutError.set(null);
   }
 
@@ -203,7 +179,8 @@ export class App implements OnInit {
           whatsappWindow.location.href = whatsappUrl;
         }
         this.orderConfirmation.set(order);
-        this.clearCart();
+        this.cartService.clear();
+        this.cartNotice.set('');
         this.isSubmittingOrder.set(false);
       },
       error: (error: HttpErrorResponse) => {
@@ -261,14 +238,6 @@ export class App implements OnInit {
 
   protected unitPriceCents(item: CartItem): number {
     return item.product.price_cents + (item.variant?.price_adjustment_cents ?? 0);
-  }
-
-  private isSameCartLine(
-    item: CartItem,
-    product: Product,
-    variant: ProductVariant | null,
-  ): boolean {
-    return item.product.id === product.id && item.variant?.id === variant?.id;
   }
 
   private checkoutErrorMessage(error: HttpErrorResponse): string {

@@ -1,10 +1,12 @@
+import hashlib
+import json
 from typing import Optional
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.product import Product, ProductVariant
-from app.models.user import User
 from app.schemas.order import OrderCreate
 
 
@@ -16,11 +18,32 @@ def get_order_by_id(db: Session, order_id: int) -> Optional[Order]:
     return db.query(Order).filter(Order.id == order_id).first()
 
 
-def create_order(db: Session, payload: OrderCreate) -> Order:
-    if payload.user_id is not None:
-        user = db.query(User).filter(User.id == payload.user_id).first()
-        if user is None:
-            raise ValueError("El usuario indicado no existe.")
+class IdempotencyConflict(ValueError):
+    pass
+
+
+def _request_hash(payload: OrderCreate) -> str:
+    # Hash del contrato validado, independiente de valores actuales del catálogo.
+    normalized = payload.model_dump(mode="json")
+    for field in ("customer_name", "customer_phone", "delivery_address"):
+        normalized[field] = normalized[field].strip()
+    encoded = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _existing_order(db: Session, key: str, request_hash: str) -> Order | None:
+    order = db.query(Order).filter(Order.idempotency_key == key).first()
+    if order is not None and order.request_hash != request_hash:
+        raise IdempotencyConflict("La clave del pedido ya se usó con otros datos.")
+    return order
+
+
+def create_order(db: Session, payload: OrderCreate, idempotency_key: str | None = None) -> Order:
+    request_hash = _request_hash(payload) if idempotency_key else None
+    if idempotency_key:
+        existing = _existing_order(db, idempotency_key, request_hash)
+        if existing is not None:
+            return existing
 
     customer_name = payload.customer_name.strip()
     customer_phone = payload.customer_phone.strip()
@@ -60,6 +83,8 @@ def create_order(db: Session, payload: OrderCreate) -> Order:
         unit_price_cents = product.price_cents + (variant.price_adjustment_cents if variant else 0)
         line_total = unit_price_cents * item.quantity
         subtotal += line_total
+        if unit_price_cents < 0 or subtotal > 2_147_483_647:
+            raise ValueError("El importe del pedido excede el máximo permitido.")
 
         order_items.append(
             OrderItem(
@@ -78,7 +103,9 @@ def create_order(db: Session, payload: OrderCreate) -> Order:
         )
 
     order = Order(
-        user_id=payload.user_id,
+        user_id=None,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
         customer_name=customer_name,
         customer_phone=customer_phone,
         delivery_address=delivery_address,
@@ -95,7 +122,16 @@ def create_order(db: Session, payload: OrderCreate) -> Order:
         order.items.append(item)
 
     db.add(order)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Una restricción única resuelve también dos solicitudes simultáneas.
+        if idempotency_key:
+            existing = _existing_order(db, idempotency_key, request_hash)
+            if existing is not None:
+                return existing
+        raise
     db.refresh(order)
     return order
 

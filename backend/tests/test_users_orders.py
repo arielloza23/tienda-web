@@ -45,9 +45,7 @@ def test_create_order_success(client: TestClient) -> None:
     }
     user_response = client.post("/api/v1/users", json=user_payload)
     assert user_response.status_code == 201
-    user_id = user_response.json()["id"]
     order_payload = {
-        "user_id": user_id,
         "customer_name": "María López",
         "customer_phone": "+593 987 654 321",
         "delivery_address": "Av. Amazonas 123, Quito",
@@ -63,7 +61,7 @@ def test_create_order_success(client: TestClient) -> None:
     order_response = client.post("/api/v1/orders", json=order_payload)
     assert order_response.status_code == 201
     body = order_response.json()
-    assert body["user_id"] == user_id
+    assert body["user_id"] is None
     assert body["customer_name"] == "María López"
     assert body["status"] == "pending"
     assert body["subtotal_cents"] == 399800
@@ -118,7 +116,6 @@ def test_create_order_does_not_require_stock(client: TestClient) -> None:
     response = client.post(
         "/api/v1/orders",
         json={
-            "user_id": user_response.json()["id"],
             "customer_name": "Ana García",
             "customer_phone": "0991234567",
             "delivery_address": "Calle 10 y Avenida 5, Quito",

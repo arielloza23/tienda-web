@@ -95,6 +95,7 @@
           } @else if (cart().length === 0) {
             <div class="empty-cart"><span class="empty-cart-symbol" aria-hidden="true">＋</span><h3>Un espacio para tus favoritos.</h3><p>Elige una pieza y tu talla. Aquí empieza tu próximo pedido.</p><a href="#catalog" (click)="closeCart()">Explorar la colección ↗</a></div>
           } @else {
+            @if (cartNotice()) { <p class="checkout-note" role="status">{{ cartNotice() }}</p> }
             <ul class="cart-list">
               @for (item of cart(); track cartItemKey(item)) {
                 <li class="cart-item">
@@ -107,18 +108,18 @@
                         <span>{{ variantLabel(item.variant) }}</span>
                       }
                     </div>
-                    <button type="button" class="remove-button" (click)="removeFromCart(item)">
+                    <button type="button" class="remove-button" [disabled]="isSubmittingOrder()" (click)="removeFromCart(item)">
                       Quitar
                     </button>
                   </div>
 
                   <div class="cart-item-footer">
                     <div class="quantity-control" aria-label="Cantidad">
-                      <button type="button" aria-label="Restar una unidad" (click)="decreaseQuantity(item)">
+                      <button type="button" aria-label="Restar una unidad" [disabled]="isSubmittingOrder()" (click)="decreaseQuantity(item)">
                         −
                       </button>
                       <span>{{ item.quantity }}</span>
-                      <button type="button" aria-label="Añadir una unidad" (click)="increaseQuantity(item)">
+                      <button type="button" aria-label="Añadir una unidad" [disabled]="isSubmittingOrder() || item.quantity >= 100" (click)="increaseQuantity(item)">
                         +
                       </button>
                     </div>
@@ -135,6 +136,7 @@
             </div>
 
             <form class="checkout-form" ngNativeValidate (ngSubmit)="placeOrder()">
+              <fieldset class="checkout-fields" [disabled]="isSubmittingOrder()">
               <div class="checkout-heading"><span>02</span><div><h3>¿A dónde te lo llevamos?</h3><p>Completa tus datos y marca la entrega.</p></div></div>
 
               <label for="customer-name">Nombre y apellido</label>
@@ -171,8 +173,10 @@
                 @defer (on viewport) {
                 <app-delivery-map
                   [location]="deliveryLocation()"
-                  (locationChange)="deliveryLocation.set($event)"
-                  (addressChange)="deliveryAddress.set($event)"
+                  [disabled]="isSubmittingOrder()"
+                  [attr.inert]="isSubmittingOrder() ? '' : null"
+                  (locationChange)="!isSubmittingOrder() && deliveryLocation.set($event)"
+                  (addressChange)="!isSubmittingOrder() && deliveryAddress.set($event)"
                   (addressLoadingChange)="isLookingUpAddress.set($event)"
                 />
                 } @placeholder {
@@ -205,8 +209,9 @@
                 {{ isSubmittingOrder() ? 'Registrando pedido...' : isLookingUpAddress() ? 'Buscando dirección...' : 'Confirmar mi pedido' }} <span aria-hidden="true">↗</span>
               </button>
               <p class="checkout-note">Después podrás compartir tu pedido por WhatsApp y coordinar el envío.</p>
+              </fieldset>
             </form>
-            <button type="button" class="clear-cart" (click)="clearCart()">Vaciar pedido</button>
+            <button type="button" class="clear-cart" [disabled]="isSubmittingOrder()" (click)="clearCart()">Vaciar pedido</button>
           }
         </dialog>
   <footer class="footer"><a class="footer-brand" href="#top">tienda web<span>Pequeños detalles. Muy tuyos.</span></a><a href="#catalog">Volver a la colección ↑</a><span>Ecuador · Precios en USD</span></footer>

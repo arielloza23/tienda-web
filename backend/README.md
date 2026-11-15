@@ -118,3 +118,27 @@ El resto (listar usuarios y pedidos, ver un pedido, cambiar su estado y crear pr
    ```
 
    En `/docs` puedes pulsar **Authorize** y pegar el token.
+
+
+## Seguridad y reintentos de pedidos
+
+- Define `APP_ENV=production` en producción. El arranque exige autenticación
+  administrativa activa y una `SECRET_KEY` aleatoria de al menos 32 caracteres.
+  El Blueprint local incluye este entorno; no se han aplicado cambios remotos.
+  Desarrollo y pruebas pueden usar `development` y `test` respectivamente.
+- El checkout público acepta `user_id` solo omitido o `null`: no permite atribuir
+  pedidos a una cuenta a través del cuerpo de la solicitud.
+- Máximo 50 líneas y 100 unidades por producto/variante, incluyendo líneas repetidas.
+  El importe calculado no puede superar 2147483647 centavos.
+- `POST /api/v1/orders` admite `Idempotency-Key` con formato UUID. Una clave y
+  cuerpo idénticos (con espacios exteriores de contacto normalizados) devuelven
+  el mismo pedido con 201. Reutilizarla con otro cuerpo devuelve 409. Sin cabecera
+  se conserva la compatibilidad, sin protección frente a pedidos duplicados.
+  Tratar la clave como dato confidencial y usar UUID aleatorios; no aparece en las
+  respuestas. El cliente genera una nueva clave cuando cambia el pedido.
+
+La revisión `20261115_order_idempotency` añade columnas opcionales y un índice
+único, sin modificar pedidos existentes. Antes de usar el código contra una base
+existente, respaldarla y aplicar `alembic upgrade head`. El downgrade conserva
+los pedidos, pero elimina sus claves e historial de reintentos. La validación
+local usa bases temporales; no aplicar migraciones sobre bases reales como prueba.

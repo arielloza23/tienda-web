@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
 from app.db.session import get_db
 from app.models.order import OrderStatus
 from app.schemas.order import OrderCreate, OrderRead
-from app.services.order_service import create_order, get_order_by_id, get_orders, update_order_status
+from app.services.order_service import IdempotencyConflict, create_order, get_order_by_id, get_orders, update_order_status
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -24,9 +26,15 @@ def read_order(order_id: int, db: Session = Depends(get_db)) -> OrderRead:
 
 
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
-def create_new_order(payload: OrderCreate, db: Session = Depends(get_db)) -> OrderRead:
+def create_new_order(
+    payload: OrderCreate,
+    db: Session = Depends(get_db),
+    idempotency_key: UUID | None = Header(default=None, alias="Idempotency-Key"),
+) -> OrderRead:
     try:
-        return create_order(db, payload)
+        return create_order(db, payload, str(idempotency_key) if idempotency_key else None)
+    except IdempotencyConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

@@ -1,0 +1,67 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CartService, CART_STORAGE_KEY } from './cart.service';
+import { Product } from '../models/product.model';
+
+const product: Product = { id: 1, name: 'Body', slug: 'body', price_cents: 1500, is_active: true,
+  variants: [{ id: 2, sku: 'BODY-M', size: 'M', color: 'Vino', price_adjustment_cents: 500 }] };
+
+describe('CartService', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  it('restores only identifiers and quantities using fresh catalog prices', () => {
+    const cart = new CartService();
+    cart.reconcile([product]);
+    cart.add(product, product.variants[0]);
+    cart.add(product, product.variants[0]);
+    expect(JSON.parse(localStorage.getItem(CART_STORAGE_KEY)!)).toEqual({ version: 1,
+      items: [{ product_id: 1, variant_id: 2, quantity: 2 }] });
+    const restored = new CartService();
+    restored.reconcile([{ ...product, price_cents: 2500 }]);
+    expect(restored.count()).toBe(2);
+    expect(restored.subtotalCents()).toBe(6000);
+  });
+
+  it('drops unavailable variants and malformed storage without breaking checkout', () => {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify({ version: 1, items: [
+      { product_id: 1, variant_id: 999, quantity: 1 },
+      { product_id: 1, variant_id: 2, quantity: -1 },
+      { product_id: 1, variant_id: 2, quantity: 1.5 },
+    ] }));
+    const cart = new CartService();
+    cart.reconcile([product]);
+    expect(cart.count()).toBe(0);
+    localStorage.setItem(CART_STORAGE_KEY, 'invalid json');
+    const broken = new CartService();
+    expect(() => broken.reconcile([product])).not.toThrow();
+    expect(broken.items()).toEqual([]);
+  });
+
+  it('enforces quantity and line limits, including duplicate restored lines', () => {
+    const cart = new CartService();
+    cart.reconcile([product]);
+    for (let i = 0; i < 100; i++) cart.add(product, product.variants[0]);
+    expect(cart.add(product, product.variants[0])).toBe(false);
+    expect(cart.count()).toBe(100);
+    cart.clear();
+    for (let i = 1; i <= 50; i++) cart.add({ ...product, id: i, variants: [] });
+    expect(cart.add({ ...product, id: 51, variants: [] })).toBe(false);
+    expect(cart.items()).toHaveLength(50);
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify({ version: 1, items: [
+      { product_id: 1, variant_id: 2, quantity: 80 },
+      { product_id: 1, variant_id: 2, quantity: 80 },
+    ] }));
+    const restored = new CartService();
+    restored.reconcile([product]);
+    expect(restored.count()).toBe(100);
+  });
+
+  it('works when local storage is blocked', () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    try {
+      const cart = new CartService();
+      cart.reconcile([product]);
+      expect(cart.add(product, product.variants[0])).toBe(true);
+      expect(cart.count()).toBe(1);
+    } finally { spy.mockRestore(); }
+  });
+});
