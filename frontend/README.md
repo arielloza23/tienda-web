@@ -142,3 +142,32 @@ Después de compilar, se puede comprobar el flujo con Chrome y datos temporales:
 La prueba realiza una compra invitada, registro, acceso, publicación y actualización
 de una opinión, lectura pública, cambio de producto y vista móvil. Usa API local,
 SQLite en memoria y respuestas simuladas para servicios externos; no toca producción.
+
+
+## Carrusel de productos y galería
+
+El carrusel principal muestra la portada de cada producto. Sus flechas, teclado y
+el gesto horizontal navegan entre productos. Elegir talla o color no sustituye
+la portada. Al pulsar la imagen se abre la galería con la portada y todas las
+fotos adicionales de ese artículo; dentro del diálogo las flechas recorren fotos.
+
+Tras compilar, la prueba aislada de Chrome se ejecuta desde la raíz con:
+
+```powershell
+.\.venv\Scripts\python.exe frontend/tests/showcase_browser.py
+```
+
+Usa un catálogo y respuestas simuladas; no accede a producción.
+
+
+La guía **Así de sencillo** se muestra debajo del carrusel completo, con
+los tres pasos de compra y el enlace **Cómo comprar** apuntando a ese bloque.
+Las opiniones presentan estrellas vacías o rellenas; el selector conserva las
+etiquetas accesibles y el manejo por teclado, sin números visibles en las estrellas.
+
+
+**Ver opiniones** abre una ventana con el nombre y las reseñas del producto
+seleccionado. Al cerrarla se desmonta el formulario; al abrir otro artículo se
+consulta su propia lista y calificación. El acceso a la cuenta puede abrirse
+sobre esa ventana para comentar sin perder el producto consultado.
+La guía horizontal de compra está debajo del carrusel completo, con mayor ancho.

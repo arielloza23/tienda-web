@@ -64,4 +64,16 @@ describe('Product reviews form', async () => {
     expect(fixture.nativeElement.textContent).toContain('Actualizar opinión');
     expect(fixture.nativeElement.textContent).toContain('1 opinión');
   });
+  it('uses accessible radios and filled stars without visible numeric options', async () => {
+    login(); await load(); await draft(3);
+    const options: HTMLElement = fixture.nativeElement.querySelector('.rating-options');
+    expect(options.textContent?.replace(/\s/g, '')).toBe('★★★☆☆');
+    const radios = options.querySelectorAll<HTMLInputElement>('input[type=radio]');
+    expect(radios).toHaveLength(5);
+    expect(radios[0].getAttribute('aria-label')).toBe('1 estrella');
+    expect(radios[2].checked).toBe(true);
+    expect(radios[4].getAttribute('aria-label')).toBe('5 estrellas');
+    expect(options.textContent).not.toMatch(/[1-5]/);
+  });
+
 });

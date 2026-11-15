@@ -22,19 +22,21 @@ export class ProductShowcase {
   protected readonly selectedVariant = computed(() => this.product()?.variants.find((variant) => variant.id === this.variantId()) ?? null);
   protected readonly photoIndex = signal(0);
   protected readonly photoColor = computed(() => this.selectedVariant()?.color ?? this.product()?.variants[0]?.color ?? this.product()?.images?.[0]?.color ?? '');
-  protected readonly photos = computed(() => {
+  protected readonly cover = computed(() => {
     const product = this.product();
-    if (!product) return [];
-    const normalize = (color: string) => color.trim().toLocaleLowerCase();
-    const color = normalize(this.photoColor());
-    const primaryColor = normalize(product.variants[0]?.color ?? product.images?.[0]?.color ?? '');
-    const gallery = (product.images ?? []).filter((image) => normalize(image.color) === color);
-    const primary = product.image_url && color === primaryColor
-      ? [{ url: product.image_url, alt: `${product.name} · Vista principal` }] : [];
-    return [...primary, ...gallery].filter((image, index, images) => images.findIndex((entry) => entry.url === image.url) === index);
+    if (!product) return undefined;
+    return product.image_url ? { url: product.image_url, alt: `${product.name} · Vista principal`, color: '' } : product.images?.[0];
+  });
+  protected readonly photos = computed(() => {
+    const cover = this.cover();
+    return [...(cover ? [cover] : []), ...(this.product()?.images ?? [])]
+      .filter((image, index, images) => images.findIndex((entry) => entry.url === image.url) === index);
   });
   protected readonly currentPhoto = computed(() => this.photos()[this.photoIndex() % (this.photos().length || 1)]);
   private readonly photoDialog = viewChild.required<ElementRef<HTMLDialogElement>>('photoDialog');
+  private readonly reviewsDialog = viewChild.required<ElementRef<HTMLDialogElement>>('reviewsDialog');
+  protected readonly reviewsProduct = signal<{ id: number; name: string } | null>(null);
+  private reviewsTrigger?: HTMLElement;
   private readonly photoStage = viewChild<ElementRef<HTMLElement>>('photoStage');
   protected readonly price = computed(() => (this.product()?.price_cents ?? 0) + (this.selectedVariant()?.price_adjustment_cents ?? 0));
   protected readonly theme = computed(() => {
@@ -44,6 +46,7 @@ export class ProductShowcase {
     return 'charcoal';
   });
   private gesture?: { x: number; y: number; pointerId: number };
+  private suppressClickUntil = 0;
 
   constructor() {
     effect(() => {
@@ -52,7 +55,6 @@ export class ProductShowcase {
     });
     effect(() => {
       this.product()?.id;
-      this.photoColor();
       this.photoIndex.set(0);
     });
   }
@@ -62,13 +64,46 @@ export class ProductShowcase {
     document.getElementById('catalog')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
   }
 
+  protected openReviews(event: Event): void {
+    const product = this.product();
+    if (!product) return;
+    this.reviewsTrigger = event.currentTarget as HTMLElement;
+    this.reviewsProduct.set({ id: product.id, name: product.name });
+    this.reviewsDialog().nativeElement.showModal();
+  }
+
+  protected closeReviews(): void {
+    const dialog = this.reviewsDialog().nativeElement;
+    if (dialog.open) dialog.close();
+    this.finishReviewsClose();
+  }
+
+  protected finishReviewsClose(): void {
+    if (this.reviewsDialog().nativeElement.open || !this.reviewsProduct()) return;
+    this.reviewsProduct.set(null);
+    this.reviewsTrigger?.focus({ preventScroll: true });
+    this.reviewsTrigger = undefined;
+  }
+
+  protected onReviewsBackdrop(event: MouseEvent): void {
+    if (event.target !== event.currentTarget) return;
+    const rect = this.reviewsDialog().nativeElement.getBoundingClientRect();
+    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) this.closeReviews();
+  }
+
   protected movePhoto(step: number): void {
     if (this.photos().length < 2) return;
     this.photoIndex.update((index) => Math.max(0, Math.min(index + step, this.photos().length - 1)));
   }
 
   protected openPhoto(): void {
-    if (this.currentPhoto()) this.photoDialog().nativeElement.showModal();
+    if (performance.now() < this.suppressClickUntil) return;
+    this.photoIndex.set(0);
+    if (this.cover()) this.photoDialog().nativeElement.showModal();
+  }
+
+  protected onDialogClick(event: MouseEvent): void {
+    if (performance.now() >= this.suppressClickUntil && event.target === event.currentTarget) this.closePhoto();
   }
 
   protected closePhoto(): void {
@@ -98,18 +133,23 @@ export class ProductShowcase {
   }
 
   protected startGesture(event: PointerEvent): void {
-    if (!event.isPrimary || event.button !== 0 || (event.target as HTMLElement).closest('button, a')) return;
+    const target = event.target as HTMLElement;
+    if (!event.isPrimary || event.button !== 0 || (target.closest('button, a') && !target.closest('.photo-open'))) return;
+    this.suppressClickUntil = 0;
     this.gesture = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    const capture = (target.closest('.photo-open') ?? target) as HTMLElement;
+    capture.setPointerCapture(event.pointerId);
   }
 
-  protected finishGesture(event: PointerEvent): void {
+  protected finishGesture(event: PointerEvent, gallery = false): void {
     if (!this.gesture || this.gesture.pointerId !== event.pointerId) return;
     const dx = event.clientX - this.gesture.x;
     const dy = event.clientY - this.gesture.y;
     this.gesture = undefined;
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.3) {
-      this.movePhoto(dx < 0 ? 1 : -1);
+      this.suppressClickUntil = performance.now() + 500;
+      if (gallery) this.movePhoto(dx < 0 ? 1 : -1);
+      else this.move(dx < 0 ? 1 : -1);
     }
   }
 

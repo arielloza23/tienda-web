@@ -1,7 +1,7 @@
 <section class="reviews" aria-label="Opiniones del producto">
   <header><div><p class="eyebrow">Tu experiencia cuenta</p><h2>Opiniones del producto</h2></div>
     @if (page(); as page) {
-      <p class="summary" aria-live="polite">@if (page.average_rating !== null) { <strong>{{ page.average_rating | number:'1.1-1' }} / 5 <span aria-hidden="true">★</span></strong> } @else { <strong>Sin calificaciones</strong> }<br />{{ page.total }} {{ page.total === 1 ? 'opinión' : 'opiniones' }}</p>
+      <p class="summary" aria-live="polite">@if (page.average_rating !== null) { <strong><span class="summary-star" aria-hidden="true">★</span> {{ page.average_rating | number:'1.1-1' }} <small>de 5</small></strong> } @else { <strong>Sin calificaciones</strong> }<br />{{ page.total }} {{ page.total === 1 ? 'opinión' : 'opiniones' }}</p>
     }
   </header>
   @if (loading()) { <p role="status">Cargando opiniones…</p> }
@@ -9,8 +9,8 @@
   @if (page(); as page) {
     <div class="review-list">
       @for (review of page.items; track review.id) {
-        <article><div class="review-heading"><strong>{{ review.author_name }}</strong><time [attr.datetime]="review.created_at">{{ review.created_at | date:'dd/MM/yyyy' }}</time></div>
-          <p class="stars" [attr.aria-label]="review.rating + ' de 5 estrellas'"><span aria-hidden="true">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span></p>
+        <article class="review-card"><div class="review-heading"><span class="review-avatar" aria-hidden="true">{{ review.author_name.slice(0, 1).toUpperCase() }}</span><div class="review-author"><strong>{{ review.author_name }}</strong><time [attr.datetime]="review.created_at">{{ review.created_at | date:'dd/MM/yyyy' }}</time></div></div>
+          <p class="stars" role="img" [attr.aria-label]="review.rating + ' de 5 estrellas'"><span aria-hidden="true"><span class="filled-stars">{{ '★'.repeat(review.rating) }}</span><span class="empty-stars">{{ '☆'.repeat(5 - review.rating) }}</span></span></p>
           @if (review.comment) { <p class="comment">{{ review.comment }}</p> }
         </article>
       } @empty { <p>Aún no hay opiniones. Comparte la primera.</p> }
@@ -26,7 +26,7 @@
       @if (mineError()) { <p role="alert">{{ mineError() }}</p><button type="button" (click)="retryMine()">Volver a consultar mi opinión</button> }
       <form (ngSubmit)="save()">
         <fieldset [disabled]="saving() || loadingMine() || !!mineError()"><legend>Tu calificación</legend>
-          <div class="rating-options">@for (star of stars; track star) { <label [class.selected]="rating() === star"><input type="radio" name="rating" [value]="star" [ngModel]="rating()" (ngModelChange)="setRating($event)" required [attr.aria-label]="star + (star === 1 ? ' estrella' : ' estrellas')" /><span aria-hidden="true">{{ star }} ★</span></label> }</div>
+          <div class="rating-options">@for (star of stars; track star) { <label [class.selected]="rating() === star" [class.filled]="star <= (rating() || 0)"><input type="radio" name="rating" [value]="star" [ngModel]="rating()" (ngModelChange)="setRating($event)" required [attr.aria-label]="star + (star === 1 ? ' estrella' : ' estrellas')" /><span aria-hidden="true">{{ star <= (rating() || 0) ? '★' : '☆' }}</span></label> }</div>
           <label class="comment-label">Tu comentario<textarea name="comment" [ngModel]="comment()" (ngModelChange)="setComment($event)" maxlength="2000" rows="4" placeholder="Cuéntanos tu experiencia (opcional)"></textarea></label>
           <small>{{ comment().length }}/2000 caracteres. Tu nombre y opinión serán públicos.</small>
           <button type="submit" [disabled]="!rating()">{{ saving() ? 'Guardando…' : mine() ? 'Actualizar opinión' : 'Publicar opinión' }}</button>

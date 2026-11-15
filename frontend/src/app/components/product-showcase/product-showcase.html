@@ -12,39 +12,30 @@
 
       <div class="showcase-media">
       <div class="photo-gallery-heading">
-        <span>Fotos de este producto</span>
-        <span class="photo-position" aria-live="polite" aria-atomic="true">Foto {{ photos().length ? photoIndex() + 1 : 0 }} de {{ photos().length }}</span>
+        <span>Portada del producto</span>
+        <span class="photo-position" aria-live="polite" aria-atomic="true">Producto {{ index() + 1 }} de {{ products().length }}</span>
       </div>
-      <div #photoStage class="showcase-stage" tabindex="0" role="group" [attr.aria-label]="'Fotos de ' + featured.name + '. Las flechas cambian solo sus fotos.'"
-        (keydown.arrowleft)="movePhoto(-1); $event.preventDefault()" (keydown.arrowright)="movePhoto(1); $event.preventDefault()"
+      <div #photoStage class="showcase-stage" tabindex="0" role="group" [attr.aria-label]="'Productos de la colección. Actual: ' + featured.name + '. Usa las flechas para cambiar de producto.'"
+        (keydown.arrowleft)="move(-1); $event.preventDefault()" (keydown.arrowright)="move(1); $event.preventDefault()"
         (pointerdown)="startGesture($event)" (pointerup)="finishGesture($event)"
         (pointercancel)="cancelGesture()" (lostpointercapture)="cancelGesture()">
         <span class="stage-word" aria-hidden="true">íntima</span>
-        @for (photo of currentPhoto() ? [currentPhoto()!] : []; track photo.url) {
+        @for (photo of cover() ? [cover()!] : []; track photo.url) {
           <figure class="showcase-photo">
-            <img [src]="photo.url" [alt]="photo.alt" width="700" height="900" fetchpriority="high" draggable="false" />
-            <figcaption><span>Detalles para ti</span><span aria-hidden="true">✳</span></figcaption>
-            <button type="button" class="photo-expand" (click)="openPhoto()" aria-label="Ampliar foto del producto">⤢</button>
+            <button type="button" class="photo-open" (click)="openPhoto()" [attr.aria-label]="'Ver fotos de ' + featured.name" aria-haspopup="dialog">
+              <img [src]="photo.url" [alt]="photo.alt" width="700" height="900" fetchpriority="high" draggable="false" />
+              <span class="photo-open-hint">Ver fotos <span aria-hidden="true">⤢</span></span>
+            </button>
           </figure>
         }
-        @if (!currentPhoto()) { <p class="photo-empty">No hay fotos disponibles para este color.</p> }
+        @if (!cover()) { <p class="photo-empty">Este producto todavía no tiene fotos.</p> }
         <div class="stage-shadow" aria-hidden="true"></div>
-        @if (photos().length > 1) {
-          <button type="button" class="stage-arrow stage-arrow-prev" aria-label="Foto anterior de este producto" [disabled]="photoIndex() === 0" (click)="movePhoto(-1)">←</button>
-          <button type="button" class="stage-arrow stage-arrow-next" aria-label="Siguiente foto de este producto" [disabled]="photoIndex() >= photos().length - 1" (click)="movePhoto(1)">→</button>
+        @if (products().length > 1) {
+          <button type="button" class="stage-arrow stage-arrow-prev" aria-label="Producto anterior" [disabled]="!previousProduct()" (click)="move(-1)">←</button>
+          <button type="button" class="stage-arrow stage-arrow-next" aria-label="Siguiente producto" [disabled]="!nextProduct()" (click)="move(1)">→</button>
         }
       </div>
-      @if (photos().length > 1) {
-        <div class="photo-thumbnails" role="group" [attr.aria-label]="'Fotos de ' + featured.name + ', color ' + photoColor()">
-          @for (photo of photos(); track photo.url; let i = $index) {
-            <button type="button" [class.active]="photoIndex() === i" [attr.aria-pressed]="photoIndex() === i"
-              [attr.aria-label]="'Ver foto ' + (i + 1) + ': ' + photo.alt" (click)="photoIndex.set(i)">
-              <img [src]="photo.url" [alt]="photo.alt" width="48" height="58" loading="lazy" />
-            </button>
-          }
-        </div>
-        <p class="photo-count"><span class="photo-swipe-hint">Desliza para ver sus fotos · </span>{{ photoColor() }}</p>
-      }
+      <p class="photo-count"><span class="photo-swipe-hint">Desliza para cambiar de producto · </span>Pulsa la portada para ver sus fotos</p>
       </div>
 
       <div class="showcase-details" aria-live="polite" aria-atomic="false">
@@ -67,9 +58,31 @@
         <button type="button" class="showcase-add" [disabled]="!!featured.variants.length && !selectedVariant()" (click)="addToOrder()">
           {{ featured.variants.length && !selectedVariant() ? 'Selecciona tu talla' : 'Añadir a mi pedido' }} <span aria-hidden="true">+</span>
         </button>
-        <p class="showcase-delivery">Elige tu entrega y coordina por WhatsApp.</p>
+        <button type="button" class="showcase-reviews" (click)="openReviews($event)" aria-haspopup="dialog" aria-controls="product-reviews-dialog" [attr.aria-label]="'Ver opiniones de ' + featured.name">
+          <span aria-hidden="true">☆</span> Ver opiniones <span aria-hidden="true">↗</span>
+        </button>
       </div>
     </div>
+
+
+    <section class="purchase-guide" id="how-it-works" aria-labelledby="purchase-guide-title">
+          <p class="guide-eyebrow">Así de sencillo</p>
+          <h3 id="purchase-guide-title">De tu favorito <em>a tu puerta.</em></h3>
+          <ol aria-label="Tres pasos para comprar">
+            <li>
+              <span class="guide-icon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 9a3 3 0 1 1 5 2c-1 1-2 1-2 3v2"/><path d="m16 16 12 7a2 2 0 0 1-1 4H5a2 2 0 0 1-1-4l12-7Z"/></svg><span>1</span></span>
+              <h4>Encuentra tu pieza</h4><p>Elige tu color y talla.</p>
+            </li>
+            <li>
+              <span class="guide-icon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M26 13c0 8-10 16-10 16S6 21 6 13a10 10 0 1 1 20 0Z"/><circle cx="16" cy="13" r="3.5"/></svg><span>2</span></span>
+              <h4>Marca tu ubicación</h4><p>Señala tu entrega en el mapa.</p>
+            </li>
+            <li>
+              <span class="guide-icon guide-chat" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M28 15a12 12 0 0 1-17 11L4 28l2-7A12 12 0 1 1 28 15Z"/><path d="m12 9-3 2c0 6 6 12 12 12l2-3-4-2-2 2c-2-1-4-3-5-5l2-2-2-4Z"/></svg><span>3</span></span>
+              <h4>Hablemos por WhatsApp</h4><p>Comparte y coordina tu pedido.</p>
+            </li>
+          </ol>
+        </section>
 
     @if (products().length > 1) {
       <nav class="product-navigation" aria-label="Cambiar de producto">
@@ -92,20 +105,30 @@
         </div>
       </nav>
     }
-    <app-product-reviews [productId]="featured.id" />
   } @else {
     <div class="showcase-empty"><p class="showcase-kicker">Lencería de encaje</p><h1>Tu esencia.<br /><em>Solo tuyo.</em></h1><a class="showcase-explore" href="#catalog" (click)="scrollCatalog($event)">Explorar catálogo ↗</a></div>
   }
 </section>
-<dialog #photoDialog class="photo-dialog" aria-label="Foto ampliada del producto"
-  (click)="$event.target === $event.currentTarget && closePhoto()"
+<dialog #photoDialog class="photo-dialog" [attr.aria-label]="'Fotos de ' + (product()?.name || 'producto')"
+  (click)="onDialogClick($event)"
+  (pointerdown)="startGesture($event)" (pointerup)="finishGesture($event, true)"
+  (pointercancel)="cancelGesture()" (lostpointercapture)="cancelGesture()"
   (keydown.arrowleft)="movePhoto(-1); $event.preventDefault()" (keydown.arrowright)="movePhoto(1); $event.preventDefault()">
-  <button type="button" class="photo-dialog-close" aria-label="Cerrar foto ampliada" (click)="closePhoto()">×</button>
+  <button type="button" class="photo-dialog-close" aria-label="Cerrar galería" (click)="closePhoto()">×</button>
   @if (currentPhoto(); as photo) {
-    <img [src]="photo.url" [alt]="photo.alt" />
-    <p>{{ photo.alt }} · {{ photoColor() }}</p>
+    <img [src]="photo.url" [alt]="photo.alt" draggable="false" />
+    <p>{{ photo.alt }}@if (photo.color) { · {{ photo.color }} }</p>
   }
   @if (photos().length > 1) {
-    <div class="photo-dialog-controls"><button type="button" aria-label="Foto anterior" [disabled]="photoIndex() === 0" (click)="movePhoto(-1)">←</button><span>Foto {{ photoIndex() + 1 }} de {{ photos().length }}</span><button type="button" aria-label="Siguiente foto" [disabled]="photoIndex() >= photos().length - 1" (click)="movePhoto(1)">→</button></div>
+    <div class="photo-dialog-controls"><button type="button" aria-label="Foto anterior" [disabled]="photoIndex() === 0" (click)="movePhoto(-1)">←</button><span aria-live="polite" aria-atomic="true">Foto {{ photoIndex() + 1 }} de {{ photos().length }}</span><button type="button" aria-label="Siguiente foto" [disabled]="photoIndex() >= photos().length - 1" (click)="movePhoto(1)">→</button></div>
   }
+</dialog>
+
+<dialog #reviewsDialog id="product-reviews-dialog" class="reviews-dialog" aria-labelledby="reviews-dialog-title"
+  (click)="onReviewsBackdrop($event)" (cancel)="$event.preventDefault(); closeReviews()" (close)="finishReviewsClose()">
+  <div class="reviews-dialog-heading">
+    <div><p>Lo que cuentan de esta pieza</p><h2 id="reviews-dialog-title">Opiniones de {{ reviewsProduct()?.name }}</h2></div>
+    <button type="button" class="reviews-dialog-close" aria-label="Cerrar opiniones" (click)="closeReviews()" autofocus>×</button>
+  </div>
+  @if (reviewsProduct(); as reviewed) { <app-product-reviews [productId]="reviewed.id" /> }
 </dialog>
