@@ -171,3 +171,29 @@ seleccionado. Al cerrarla se desmonta el formulario; al abrir otro artículo se
 consulta su propia lista y calificación. El acceso a la cuenta puede abrirse
 sobre esa ventana para comentar sin perder el producto consultado.
 La guía horizontal de compra está debajo del carrusel completo, con mayor ancho.
+
+
+## Elegir talla y revisar el pedido
+
+La selección muestra cada combinación real de talla y color del catálogo, sin
+confundir opciones que comparten talla. El precio incluye el ajuste de la variante.
+Al cambiar de producto o actualizar el catálogo se reinicia la selección.
+
+La guía visual explica cómo tomar medidas de busto, cintura y cadera. No recomienda
+una talla numérica ni publica una tabla genérica: el catálogo no registra medidas
+por prenda. Tampoco dispone de inventario; las opciones del catálogo no equivalen
+a existencias confirmadas y no se etiquetan como «agotadas» sin ese dato.
+
+El pedido presenta talla, color, precio unitario e importe por línea. La miniatura
+prioriza una foto del color elegido y recurre a la portada cuando no la hay.
+El subtotal corresponde a las prendas; el envío se coordina por WhatsApp.
+
+Después de compilar, verificar este recorrido con datos simulados desde la raíz:
+
+```powershell
+.\.venv\Scripts\python.exe frontend/tests/purchase_browser.py
+```
+
+La prueba comprueba variantes con la misma talla, ajustes de precio, dos líneas
+independientes, fotos por color, cantidades, subtotal y anchuras de 320 y 390 px.
+No crea pedidos ni accede a producción.

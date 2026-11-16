@@ -1,11 +1,12 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, computed, effect, ElementRef, input, model, output, signal, viewChild } from '@angular/core';
+import { ProductOptions } from '../product-options/product-options';
 import { ProductReviews } from '../product-reviews/product-reviews';
 import { Product, ProductVariant } from '../../models/product.model';
 
 @Component({
   selector: 'app-product-showcase',
-  imports: [CurrencyPipe, ProductReviews],
+  imports: [CurrencyPipe, ProductReviews, ProductOptions],
   templateUrl: './product-showcase.html',
   styleUrl: './product-showcase.scss',
 })
@@ -51,6 +52,7 @@ export class ProductShowcase {
   constructor() {
     effect(() => {
       this.selectedProductId();
+      this.products();
       this.variantId.set(null);
     });
     effect(() => {

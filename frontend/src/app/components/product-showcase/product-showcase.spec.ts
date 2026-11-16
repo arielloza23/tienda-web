@@ -26,7 +26,7 @@ describe('Product showcase covers and photo gallery', () => {
   let fixture: ComponentFixture<ProductShowcase>;
   let host: HTMLElement;
   const cover = () => host.querySelector<HTMLImageElement>('.showcase-photo img')!;
-  const dialog = () => host.querySelector<HTMLDialogElement>('dialog')!;
+  const dialog = () => host.querySelector<HTMLDialogElement>('.photo-dialog')!;
   const click = (selector: string) => { host.querySelector<HTMLButtonElement>(selector)!.click(); fixture.detectChanges(); };
   beforeEach(() => {
     TestBed.configureTestingModule({ imports: [ProductShowcase] });
@@ -122,6 +122,34 @@ describe('Product showcase covers and photo gallery', () => {
     expect(cover().src).toBe(products[0].image_url);
     click('.showcase-add');
     expect(added).toHaveBeenCalledWith({ product: products[0], variant: products[0].variants[1] });
+  });
+
+  it('clears the variant when the catalog changes and blocks adding a stale selection', () => {
+    const added = vi.fn();
+    fixture.componentInstance.addProduct.subscribe(added);
+    click('.showcase-sizes button:nth-of-type(2)');
+    expect(host.querySelector('.showcase-price')!.textContent).toContain('14.00');
+    fixture.componentRef.setInput('products', [{ ...products[0], variants: [products[0].variants[0]] }]);
+    fixture.detectChanges();
+    expect(host.querySelector<HTMLButtonElement>('.showcase-add')!.disabled).toBe(true);
+    expect(host.querySelector('.showcase-price')!.textContent).toContain('12.00');
+    click('.showcase-add');
+    expect(added).not.toHaveBeenCalled();
+  });
+
+  it('distinguishes the same size in different colors without inventing missing attributes', () => {
+    fixture.componentRef.setInput('products', [{ ...products[0], variants: [
+      products[0].variants[0], { ...products[0].variants[1], size: 'S' },
+      { id: 12, sku: 'REF-12', size: ' ', color: null, price_adjustment_cents: 0 },
+    ] }]); fixture.detectChanges();
+    const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('.showcase-sizes button'));
+    expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual([
+      'Talla S, Rojo', 'Talla S, Azul', 'Talla no especificada, Color no especificado, REF-12',
+    ]);
+    click('.showcase-sizes button:nth-of-type(2)');
+    expect(buttons[2].textContent).toContain('Referencia: REF-12');
+    expect(buttons[0].getAttribute('aria-pressed')).toBe('false');
+    expect(buttons[1].getAttribute('aria-pressed')).toBe('true');
   });
 
   it('opens all product photos on cover click, navigates photos only in the dialog, and resets on reopening', () => {

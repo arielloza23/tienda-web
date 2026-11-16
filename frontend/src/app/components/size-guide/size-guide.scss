@@ -1,0 +1,21 @@
+:host { display: inline-block; }
+.guide-trigger { display: flex; gap: 8px; align-items: center; min-height: 44px; padding: 5px 0; border: 0; background: transparent; color: var(--showcase-ink); text-decoration: underline; text-underline-offset: 4px; font-size: .75rem; }
+button:focus-visible { outline: 3px solid #a97c45; outline-offset: 3px; }
+.size-guide { width: min(600px, calc(100vw - 28px)); max-height: calc(100dvh - 32px); box-sizing: border-box; padding: clamp(20px, 4vw, 32px); border: 0; border-radius: 22px; background: #f8f7f0; color: #254239; overflow-y: auto; }
+.size-guide::backdrop { background: #15241ede; }
+.guide-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.guide-heading p { margin: 0 0 5px; font-size: .75rem; }
+h2 { margin: 0; font: 400 32px/1.1 'Instrument Serif', Georgia, serif; }
+.close { flex: 0 0 44px; height: 44px; border: 0; border-radius: 50%; background: #e8eddf; color: inherit; font-size: 1.7rem; }
+.product-name { font-size: .85rem; overflow-wrap: anywhere; }
+.measure-layout { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 20px; align-items: center; }
+svg { width: 100%; color: #6c826d; }
+.measure-line { stroke: #9a6938; }
+svg circle { fill: #f8f7f0; }
+ol { margin: 0; padding-left: 22px; }
+li { padding-left: 3px; margin: 14px 0; }
+h3 { font-size: .9rem; margin: 0 0 4px; }
+li p, .measure-tip, .measure-note { font-size: .8rem; line-height: 1.65; margin: 0; }
+.measure-tip { margin-top: 12px; }
+.measure-note { margin-top: 14px; padding: 14px; border-radius: 12px; background: #e8eddf; }
+@media (max-width: 400px) { .measure-layout { grid-template-columns: 85px minmax(0, 1fr); gap: 12px; } }

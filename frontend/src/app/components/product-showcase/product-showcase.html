@@ -43,20 +43,9 @@
         <h2>{{ featured.name }}</h2>
         <p class="showcase-price">{{ price() / 100 | currency: 'USD' }} <span>USD</span></p>
         <p class="showcase-description">{{ featured.description || 'El encanto está en los pequeños detalles.' }}</p>
-        @if (featured.variants.length) {
-          <fieldset class="showcase-sizes">
-            <legend>Elige tu talla <span>{{ selectedVariant()?.size || '' }}</span></legend>
-            @for (variant of featured.variants; track variant.id) {
-              <button type="button" [class.selected]="variantId() === variant.id" [attr.aria-pressed]="variantId() === variant.id"
-                [attr.aria-label]="'Talla ' + (variant.size || 'única') + ', ' + (variant.color || '')" (click)="variantId.set(variant.id)">
-                {{ variant.size || 'Única' }}
-                @if (featured.variants.length > 3) { <small>{{ variant.color }}</small> }
-              </button>
-            }
-          </fieldset>
-        }
+        <app-product-options [variants]="featured.variants" [selectedId]="variantId()" [productName]="featured.name" (selectVariant)="variantId.set($event)" />
         <button type="button" class="showcase-add" [disabled]="!!featured.variants.length && !selectedVariant()" (click)="addToOrder()">
-          {{ featured.variants.length && !selectedVariant() ? 'Selecciona tu talla' : 'Añadir a mi pedido' }} <span aria-hidden="true">+</span>
+          {{ featured.variants.length && !selectedVariant() ? 'Elige talla y color' : 'Añadir a mi pedido' }} <span aria-hidden="true">+</span>
         </button>
         <button type="button" class="showcase-reviews" (click)="openReviews($event)" aria-haspopup="dialog" aria-controls="product-reviews-dialog" [attr.aria-label]="'Ver opiniones de ' + featured.name">
           <span aria-hidden="true">☆</span> Ver opiniones <span aria-hidden="true">↗</span>

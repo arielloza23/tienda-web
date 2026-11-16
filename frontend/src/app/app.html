@@ -69,11 +69,12 @@
             <section class="order-confirmation" role="status" aria-live="polite">
               <p class="cart-eyebrow">Pedido recibido</p>
               <h3>Gracias, {{ confirmation.customer_name }}.</h3>
-              <p>Registramos tu compra con el número <strong>#{{ confirmation.id }}</strong>.</p>
+              <p>Registramos tu pedido con el número <strong>#{{ confirmation.id }}</strong>.</p>
               <div class="confirmation-total">
-                <span>Total del pedido</span>
+                <span>Subtotal de productos</span>
                 <strong>{{ confirmation.total_cents / 100 | currency: 'USD' }}</strong>
               </div>
+              <p class="confirmation-note">Envío: por coordinar por WhatsApp.</p>
               <p class="confirmation-note">
                 Tu pedido ya está registrado. Abre el enlace para compartir el resumen por WhatsApp y coordinar el seguimiento.
               </p>
@@ -92,31 +93,38 @@
             <ul class="cart-list">
               @for (item of cart(); track cartItemKey(item)) {
                 <li class="cart-item">
-                  <img class="cart-thumbnail" [src]="productImage(item.product)" [alt]="item.product.name" loading="lazy" />
+                  <img class="cart-thumbnail" [src]="cartItemImage(item)" [alt]="cartItemDescription(item)" loading="lazy" />
                   <div class="cart-item-details">
                   <div class="cart-item-heading">
                     <div class="cart-item-name">
                       <strong>{{ item.product.name }}</strong>
-                      @if (item.variant) {
-                        <span>{{ variantLabel(item.variant) }}</span>
+                      @if (item.variant?.size?.trim()) {
+                        <span>Talla: <b>{{ item.variant?.size?.trim() }}</b></span>
                       }
+                      @if (item.variant?.color?.trim()) {
+                        <span>Color: <b>{{ item.variant?.color?.trim() }}</b></span>
+                      }
+                      @if (item.variant && !item.variant.size?.trim() && !item.variant.color?.trim()) {
+                        <span>Referencia: {{ item.variant.sku }}</span>
+                      }
+                      <span class="cart-unit-price">{{ unitPriceCents(item) / 100 | currency: 'USD' }} por unidad</span>
                     </div>
-                    <button type="button" class="remove-button" [disabled]="isSubmittingOrder()" (click)="removeFromCart(item)">
+                    <button type="button" class="remove-button" [attr.aria-label]="'Quitar ' + cartItemDescription(item)" [disabled]="isSubmittingOrder()" (click)="removeFromCart(item)">
                       Quitar
                     </button>
                   </div>
 
                   <div class="cart-item-footer">
-                    <div class="quantity-control" aria-label="Cantidad">
-                      <button type="button" aria-label="Restar una unidad" [disabled]="isSubmittingOrder()" (click)="decreaseQuantity(item)">
+                    <div class="quantity-control" role="group" [attr.aria-label]="'Cantidad de ' + cartItemDescription(item)">
+                      <button type="button" [attr.aria-label]="'Restar una unidad de ' + cartItemDescription(item)" [disabled]="isSubmittingOrder()" (click)="decreaseQuantity(item)">
                         −
                       </button>
                       <span>{{ item.quantity }}</span>
-                      <button type="button" aria-label="Añadir una unidad" [disabled]="isSubmittingOrder() || item.quantity >= 100" (click)="increaseQuantity(item)">
+                      <button type="button" [attr.aria-label]="'Añadir una unidad de ' + cartItemDescription(item)" [disabled]="isSubmittingOrder() || item.quantity >= 100" (click)="increaseQuantity(item)">
                         +
                       </button>
                     </div>
-                    <strong>{{ (unitPriceCents(item) * item.quantity) / 100 | currency: 'USD' }}</strong>
+                    <div class="cart-line-total"><span>Importe</span><strong>{{ (unitPriceCents(item) * item.quantity) / 100 | currency: 'USD' }}</strong></div>
                   </div>
                   </div>
                 </li>
@@ -124,9 +132,11 @@
             </ul>
 
             <div class="cart-total">
-              <span>Subtotal</span>
+              <span>Subtotal de productos</span>
               <strong>{{ cartSubtotalCents() / 100 | currency: 'USD' }}</strong>
             </div>
+
+            <p class="cart-shipping"><span>Envío</span><span>Por coordinar por WhatsApp</span></p>
 
             <form class="checkout-form" ngNativeValidate (ngSubmit)="placeOrder()">
               <fieldset class="checkout-fields" [disabled]="isSubmittingOrder()">

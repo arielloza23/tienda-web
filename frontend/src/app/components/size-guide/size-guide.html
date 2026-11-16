@@ -1,0 +1,17 @@
+<button type="button" class="guide-trigger" aria-haspopup="dialog" (click)="open($event)">Guía de tallas <span aria-hidden="true">↗</span></button>
+<dialog #guide class="size-guide" aria-label="Guía de tallas" (cancel)="$event.preventDefault(); close()" (close)="restoreFocus()" (click)="backdrop($event)">
+  <div class="guide-heading"><div><p>Encuentra tu ajuste</p><h2>Guía de tallas</h2></div><button type="button" class="close" aria-label="Cerrar guía de tallas" (click)="close()" autofocus>×</button></div>
+  <p class="product-name">Para {{ productName() }}</p>
+  <div class="measure-layout">
+    <svg viewBox="0 0 180 280" role="img" aria-label="Ubicación del busto, cintura y cadera para tomar medidas" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M66 23c0 13-8 20-19 25l-16 7-12 60 15 4 13-39c-2 24 8 36 8 53 0 24-17 43-16 67l5 61h36l10-69 10 69h36l5-61c1-24-16-43-16-67 0-17 10-29 8-53l13 39 15-4-12-60-16-7c-11-5-19-12-19-25"/>
+      <path d="M66 23c9 9 39 9 48 0"/>
+      <path class="measure-line" d="M39 89h102M49 131h82M34 180h112" stroke-dasharray="4 3"/>
+      <circle cx="90" cy="89" r="11"/><circle cx="90" cy="131" r="11"/><circle cx="90" cy="180" r="11"/>
+      <g fill="currentColor" stroke="none" text-anchor="middle" font-size="12"><text x="90" y="93">1</text><text x="90" y="135">2</text><text x="90" y="184">3</text></g>
+    </svg>
+    <ol><li><h3>Busto</h3><p>Rodea la parte más amplia del busto con la cinta, sin apretar.</p></li><li><h3>Cintura</h3><p>Mide el contorno de tu cintura natural, manteniendo la cinta horizontal.</p></li><li><h3>Cadera</h3><p>Rodea la parte más amplia de la cadera, con los pies juntos.</p></li></ol>
+  </div>
+  <p class="measure-tip">Usa una cinta flexible sobre ropa ligera. Mantén una postura natural y anota tus medidas.</p>
+  <p class="measure-note">La tabla de medidas específica de esta prenda todavía no está publicada. Comparte tus medidas al coordinar tu pedido por WhatsApp para consultar la talla.</p>
+</dialog>

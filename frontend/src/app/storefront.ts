@@ -88,6 +88,24 @@ export class Storefront implements OnInit {
     return product.image_url || this.fallbackProductImage;
   }
 
+  protected cartItemImage(item: CartItem): string {
+    const color = item.variant?.color?.trim().toLocaleLowerCase();
+    const images = item.product.images ?? [];
+    const matchingImage = color
+      ? images.find((image) => image.color?.trim().toLocaleLowerCase() === color && image.url?.trim())
+      : undefined;
+    return matchingImage?.url.trim() || item.product.image_url?.trim()
+      || images.find((image) => image.url?.trim())?.url.trim() || this.fallbackProductImage;
+  }
+
+  protected cartItemDescription(item: CartItem): string {
+    return [item.product.name,
+      item.variant?.color?.trim() ? `color ${item.variant.color.trim()}` : '',
+      item.variant?.size?.trim() ? `talla ${item.variant.size.trim()}` : '',
+      item.variant && !item.variant.color?.trim() && !item.variant.size?.trim() ? item.variant.sku : '',
+    ].filter(Boolean).join(', ');
+  }
+
   protected scrollToSection(event: Event, id: string): void {
     event.preventDefault();
     document.getElementById(id)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });

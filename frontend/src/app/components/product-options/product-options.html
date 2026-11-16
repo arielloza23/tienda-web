@@ -1,0 +1,20 @@
+<div class="options-heading"><span>Hazla tuya</span><app-size-guide [productName]="productName()" /></div>
+@if (variants().length) {
+  <fieldset class="showcase-sizes">
+    <legend>Elige talla y color</legend>
+    @for (variant of variants(); track variant.id) {
+      <button type="button" [class.selected]="selectedId() === variant.id" [attr.aria-pressed]="selectedId() === variant.id"
+        [attr.aria-label]="variantLabel(variant)"
+        (click)="selectVariant.emit(variant.id)">
+        <strong>{{ variant.size?.trim() || 'Talla no especificada' }}</strong>
+        <span>{{ variant.color?.trim() || 'Color no especificado' }}</span>
+        @if (!variant.size?.trim() && !variant.color?.trim()) { <small>Referencia: {{ variant.sku }}</small> }
+        @if (variant.price_adjustment_cents) { <small>{{ variant.price_adjustment_cents > 0 ? '+' : '' }}{{ variant.price_adjustment_cents / 100 | currency: 'USD' }}</small> }
+        @if (selectedId() === variant.id) { <small class="selected-label">✓ Tu elección</small> }
+      </button>
+    }
+  </fieldset>
+  <p class="options-help">Solo se muestran las combinaciones publicadas para esta prenda.</p>
+} @else {
+  <p class="options-help">Esta prenda no tiene opciones de talla o color publicadas.</p>
+}

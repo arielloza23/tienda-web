@@ -1,0 +1,13 @@
+:host { display: block; margin-bottom: 18px; }
+.options-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; font-size: .75rem; }
+.options-heading > span { color: var(--showcase-muted); }
+.showcase-sizes { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; border: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: 10px; color: var(--showcase-muted); font-size: .75rem; }
+.showcase-sizes button { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 100px; min-height: 64px; max-width: 100%; padding: 11px 13px; border-radius: 12px; border: 1px solid var(--showcase-line); color: var(--showcase-ink); background: transparent; text-align: left; overflow-wrap: anywhere; font-size: .8rem; }
+.showcase-sizes button.selected { background: var(--showcase-strong); border-color: var(--showcase-strong); color: var(--showcase-on-strong); }
+.showcase-sizes button:hover:not(.selected) { background: var(--showcase-hover); }
+button:focus-visible { outline: 3px solid var(--showcase-accent); outline-offset: 3px; }
+strong { font-weight: 600; }
+small { font-size: .7rem; }
+.selected-label { margin-top: 3px; }
+.options-help { color: var(--showcase-muted); font-size: .7rem; line-height: 1.6; margin: 10px 0 0; }
