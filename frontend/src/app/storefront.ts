@@ -47,9 +47,52 @@ export class Storefront implements OnInit {
   protected readonly availableColors = computed(() => ['Todos', ...new Set(
     this.products().flatMap((product) => product.variants.map((variant) => variant.color?.trim()).filter((color): color is string => !!color)),
   )]);
-  protected readonly visibleProducts = computed(() => this.activeColor() === 'Todos'
-    ? this.products()
-    : this.products().filter((product) => product.variants.some((variant) => variant.color?.trim() === this.activeColor())));
+  protected readonly activeSize = signal('Todas');
+  protected readonly maximumPrice = signal<number | null>(null);
+  protected readonly catalogSort = signal('featured');
+  protected readonly availableSizes = computed(() => ['Todas', ...new Set(
+    this.products().flatMap(product => product.variants.map(variant => variant.size?.trim()).filter((size): size is string => !!size)),
+  )]);
+  protected readonly hasCatalogFilters = computed(() => this.activeColor() !== 'Todos'
+    || this.activeSize() !== 'Todas' || this.maximumPrice() !== null);
+  protected readonly visibleProducts = computed(() => {
+    const products = this.products().filter(product => this.matchingPrices(product).length > 0);
+    const direction = this.catalogSort() === 'price-asc' ? 1 : this.catalogSort() === 'price-desc' ? -1 : 0;
+    return direction ? products.sort((a, b) => direction * (this.catalogPrice(a) - this.catalogPrice(b))) : products;
+  });
+
+  protected setMaximumPrice(value: number | null): void {
+    this.maximumPrice.set(typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null);
+  }
+
+  protected clearCatalogFilters(): void {
+    this.activeColor.set('Todos');
+    this.activeSize.set('Todas');
+    this.maximumPrice.set(null);
+    this.catalogSort.set('featured');
+  }
+
+  private matchingPrices(product: Product): number[] {
+    const color = this.activeColor();
+    const size = this.activeSize();
+    const maximum = this.maximumPrice();
+    const maximumCents = maximum === null ? Infinity : Math.round(maximum * 100);
+    const prices = product.variants.length
+      ? product.variants.filter(variant => (color === 'Todos' || variant.color?.trim() === color)
+        && (size === 'Todas' || variant.size?.trim() === size))
+        .map(variant => product.price_cents + variant.price_adjustment_cents)
+      : color === 'Todos' && size === 'Todas' ? [product.price_cents] : [];
+    return prices.filter(price => price <= maximumCents);
+  }
+
+  protected catalogPrice(product: Product): number {
+    return Math.min(...this.matchingPrices(product));
+  }
+
+  protected catalogHasPriceRange(product: Product): boolean {
+    return new Set(this.matchingPrices(product)).size > 1;
+  }
+
   protected readonly cart = this.cartService.items;
   protected readonly cartNotice = this.cartService.notice;
   protected readonly isLoading = signal(false);
@@ -200,18 +243,11 @@ export class Storefront implements OnInit {
 
     this.checkoutError.set(null);
     this.isSubmittingOrder.set(true);
-    const whatsappWindow = this.whatsappPhone ? window.open('about:blank', '_blank') : null;
-    if (whatsappWindow) {
-      whatsappWindow.opener = null;
-    }
 
     this.orderService.createOrder(request).subscribe({
       next: (order) => {
         const whatsappUrl = this.buildWhatsAppFollowup(order);
         this.whatsappFollowupUrl.set(whatsappUrl);
-        if (whatsappWindow && whatsappUrl) {
-          whatsappWindow.location.href = whatsappUrl;
-        }
         this.receiptService.save(order);
         this.orderConfirmation.set(this.lastReceipt());
         this.priceChanges.set([]);
@@ -220,7 +256,6 @@ export class Storefront implements OnInit {
         this.isSubmittingOrder.set(false);
       },
       error: (error: HttpErrorResponse) => {
-        whatsappWindow?.close();
         if (error.status === 409 && error.error?.detail?.code === 'price_changed') {
           const detail = error.error.detail;
           this.priceChanges.set((Array.isArray(detail.items) ? detail.items : []).map((change: { product_id: number; variant_id: number | null; expected_unit_price_cents: number; current_unit_price_cents: number }) => {

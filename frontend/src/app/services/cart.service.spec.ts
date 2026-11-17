@@ -65,3 +65,38 @@ describe('CartService', () => {
     } finally { spy.mockRestore(); }
   });
 });
+
+// Reabrir la tienda debe reflejar también las reducciones, eliminaciones y el vaciado.
+describe('Cart persistence across visits', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('keeps quantity edits and removals after reopening, and never restores a cleared order', () => {
+    const cart = new CartService();
+    cart.reconcile([product]);
+    cart.add(product, product.variants[0]);
+    cart.add(product, product.variants[0]);
+    cart.decrease(cart.items()[0]);
+    const reopened = new CartService();
+    reopened.reconcile([product]);
+    expect(reopened.count()).toBe(1);
+    reopened.remove(reopened.items()[0]);
+    const removed = new CartService();
+    removed.reconcile([product]);
+    expect(removed.items()).toEqual([]);
+    removed.add(product, product.variants[0]);
+    removed.clear();
+    const cleared = new CartService();
+    cleared.reconcile([product]);
+    expect(cleared.items()).toEqual([]);
+  });
+
+  it('removes inactive products when reopening the store', () => {
+    const cart = new CartService();
+    cart.reconcile([product]);
+    cart.add(product, product.variants[0]);
+    const reopened = new CartService();
+    reopened.reconcile([{ ...product, is_active: false }]);
+    expect(reopened.count()).toBe(0);
+    expect(JSON.parse(localStorage.getItem(CART_STORAGE_KEY)!).items).toEqual([]);
+  });
+});

@@ -34,7 +34,30 @@
             <button type="button" [class.active]="activeColor() === color" [attr.aria-pressed]="activeColor() === color" (click)="activeColor.set(color)">{{ color }}</button>
           }
         </div>
-        <span class="result-count" aria-live="polite">{{ visibleProducts().length }} diseños</span>
+        <div class="catalog-controls">
+          <label for="catalog-size">Talla
+            <select id="catalog-size" [ngModel]="activeSize()" (ngModelChange)="activeSize.set($event)">
+              @for (size of availableSizes(); track size) { <option [value]="size">{{ size }}</option> }
+            </select>
+          </label>
+          <label for="catalog-max-price">Precio máximo (USD)
+            <input id="catalog-max-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Sin límite"
+              [ngModel]="maximumPrice()" (ngModelChange)="setMaximumPrice($event)" />
+          </label>
+          <label for="catalog-sort">Ordenar por
+            <select id="catalog-sort" [ngModel]="catalogSort()" (ngModelChange)="catalogSort.set($event)">
+              <option value="featured">Orden de la colección</option>
+              <option value="price-asc">Precio: menor a mayor</option>
+              <option value="price-desc">Precio: mayor a menor</option>
+            </select>
+          </label>
+        </div>
+        <div class="catalog-summary">
+          <span class="result-count" role="status">{{ visibleProducts().length }} {{ visibleProducts().length === 1 ? 'diseño' : 'diseños' }}</span>
+          @if (hasCatalogFilters() || catalogSort() !== 'featured') {
+            <button type="button" class="clear-filters" (click)="clearCatalogFilters()">Limpiar filtros</button>
+          }
+        </div>
       </div>
       @if (isLoading()) {
         <div class="state-card">Cargando productos...</div>
@@ -42,14 +65,17 @@
         <div class="state-card error" role="alert"><p>{{ error() }}</p><button type="button" class="retry-button" (click)="loadProducts()">Volver a intentar</button></div>
       } @else if (products().length === 0) {
         <div class="state-card">No hay productos disponibles.</div>
+      } @else if (visibleProducts().length === 0) {
+        <div class="state-card catalog-empty"><p>No encontramos diseños con estos filtros.</p><button type="button" class="retry-button" (click)="clearCatalogFilters()">Ver toda la colección</button></div>
       } @else {
+        @if (hasCatalogFilters()) { <p class="catalog-price-note">Los precios corresponden a las opciones que coinciden con tus filtros. Elige tu talla y color en la portada.</p> }
         <div class="product-miniatures" role="group" aria-label="Abrir un producto en la portada">
           @for (product of visibleProducts(); track product.id) {
             <button type="button" class="product-miniature" [class.is-active]="(featuredProductId() ?? products()[0]?.id) === product.id"
               [attr.aria-pressed]="(featuredProductId() ?? products()[0]?.id) === product.id" (click)="showProduct(product)">
               <span class="miniature-image"><img [src]="productImage(product)" [alt]="product.name" loading="lazy" /><span class="miniature-open" aria-hidden="true">↗</span></span>
               <span class="miniature-name">{{ product.name }}</span>
-              <span class="miniature-price">{{ product.price_cents / 100 | currency: 'USD' }}</span>
+              <span class="miniature-price">{{ catalogHasPriceRange(product) ? 'Desde ' : '' }}{{ catalogPrice(product) / 100 | currency: 'USD' }}</span>
             </button>
           }
         </div>
@@ -79,11 +105,11 @@
               <p class="confirmation-note">Envío y pago: por coordinar por WhatsApp.</p>
               <p class="confirmation-note">Comprobante guardado en esta pestaña durante 24 horas. Estado al registrar: {{ confirmation.status }}. Este resumen no muestra seguimiento en vivo.</p>
               <p class="confirmation-note">
-                Tu pedido ya está registrado. Abre el enlace para compartir el resumen por WhatsApp y coordinar el seguimiento.
+                Tu pedido ya está registrado. Toca el botón para continuar en WhatsApp y coordinar el envío y el pago.
               </p>
               @if (whatsappFollowupUrl(); as whatsappUrl) {
-                <a class="whatsapp-confirmation-link" [href]="whatsappUrl" target="_blank" rel="noopener noreferrer">
-                  Compartir resumen por WhatsApp <span aria-hidden="true">↗</span>
+                <a class="whatsapp-confirmation-link" [href]="whatsappUrl">
+                  Continuar en WhatsApp <span aria-hidden="true">↗</span>
                 </a>
               }
               <p class="confirmation-note">Revisa el mensaje en WhatsApp y pulsa Enviar para contactar al negocio.</p>
