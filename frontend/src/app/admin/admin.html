@@ -19,7 +19,12 @@
     </section>
   } @else {
     <p class="signed-in">Sesión de <strong>{{ auth.user()?.full_name || auth.user()?.email }}</strong></p>
-    <div class="workspace">
+    <nav class="admin-sections" aria-label="Secciones de administración">
+      <button type="button" class="button secondary" [attr.aria-pressed]="section() === 'products'" (click)="section.set('products')">Productos</button>
+      <button type="button" class="button secondary" [attr.aria-pressed]="section() === 'orders'" (click)="section.set('orders')">Pedidos</button>
+    </nav>
+    @if (section() === 'orders') { <app-admin-orders /> }
+    <div class="workspace" [hidden]="section() !== 'products'">
       <section class="panel" aria-labelledby="create-title">
         <p class="eyebrow">Catálogo</p><h2 id="create-title" #formTitle tabindex="-1">{{ editingId() === null ? 'Crear producto' : 'Editar producto' }}</h2>
         @for (version of [formVersion()]; track version) {
@@ -50,6 +55,12 @@
                     <div><label [for]="'size-' + i">Talla</label><input [id]="'size-' + i" [name]="'size-' + i" [(ngModel)]="variant.size" maxlength="50"></div>
                     <div><label [for]="'color-' + i">Color</label><input [id]="'color-' + i" [name]="'color-' + i" [(ngModel)]="variant.color" maxlength="50"></div>
                     <div><label [for]="'adjustment-' + i">Importe adicional (USD)</label><input [id]="'adjustment-' + i" [name]="'adjustment-' + i" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" [(ngModel)]="variant.adjustment" required></div>
+                  </div>
+                  <p class="muted measurement-heading">Contorno de la prenda en cm · Opcional</p>
+                  <div class="fields measurement-fields">
+                    @for (measure of measurementFields; track measure.key) {
+                      <div><label [for]="measure.key + '-' + i">{{ measure.label }}</label><input [id]="measure.key + '-' + i" [name]="measure.key + '-' + i" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9])?" [(ngModel)]="variant[measure.key]" placeholder="Sin medida"></div>
+                    }
                   </div>
                 </div>
               } @empty { <p class="empty">Sin variantes: se venderá como un producto simple.</p> }

@@ -179,10 +179,11 @@ La selección muestra cada combinación real de talla y color del catálogo, sin
 confundir opciones que comparten talla. El precio incluye el ajuste de la variante.
 Al cambiar de producto o actualizar el catálogo se reinicia la selección.
 
-La guía visual explica cómo tomar medidas de busto, cintura y cadera. No recomienda
-una talla numérica ni publica una tabla genérica: el catálogo no registra medidas
-por prenda. Tampoco dispone de inventario; las opciones del catálogo no equivalen
-a existencias confirmadas y no se etiquetan como «agotadas» sin ese dato.
+La guía visual explica cómo tomar medidas de busto, cintura y cadera y presenta
+las medidas publicadas para cada variante cuando existen. Los números son
+contornos de la prenda en cm, no medidas corporales ni recomendaciones automáticas.
+Sin medidas se muestra una indicación para consultarlas. No hay inventario: las
+opciones del catálogo no equivalen a existencias confirmadas.
 
 El pedido presenta talla, color, precio unitario e importe por línea. La miniatura
 prioriza una foto del color elegido y recurre a la portada cuando no la hay.
@@ -197,3 +198,53 @@ Después de compilar, verificar este recorrido con datos simulados desde la raí
 La prueba comprueba variantes con la misma talla, ajustes de precio, dos líneas
 independientes, fotos por color, cantidades, subtotal y anchuras de 320 y 390 px.
 No crea pedidos ni accede a producción.
+
+
+## Confirmación de precios y último comprobante
+
+Cada línea de checkout envía `expected_unit_price_cents`. Si el precio vigente
+cambió, la API devuelve 409 `detail.code=price_changed` sin registrar un pedido.
+La tienda recarga el catálogo, conserva contacto y mapa, muestra los importes
+anteriores y nuevos y exige otro clic en «Aceptar precios y confirmar».
+No reenvía la compra automáticamente. La clave de idempotencia conserva los
+reintentos del mismo cuerpo dentro de la sesión de la aplicación.
+
+Después de recibir una confirmación, `sessionStorage` guarda durante 24 horas
+el número, estado histórico, prendas e importes del último pedido de esa pestaña.
+No guarda nombre, teléfono, dirección, coordenadas, token de acceso ni URL de
+WhatsApp. «Último pedido» recupera el resumen y reconstruye un mensaje sin esos
+datos; «Olvidar comprobante» lo borra. Volver al catálogo conserva este resumen.
+Es un comprobante histórico, no un seguimiento actualizado. Cerrar la pestaña
+elimina su almacenamiento de sesión; no se recupera una respuesta que nunca
+llegó al navegador.
+
+## Medidas y atención de pedidos
+
+El administrador permite cargar `bust_cm`, `waist_cm`, `hip_cm` por variante:
+valores opcionales mayores que 0 y hasta 300, con un decimal. Son contornos de
+la prenda. No se precargan datos inventados. La sección «Pedidos» reutiliza
+la API administrativa para consultar datos y cambiar estados permitidos.
+La cancelación necesita confirmación; el pago se verifica fuera de la tienda.
+
+## Recuperación de contraseña
+
+En Mi cuenta, «Olvidé mi contraseña» solicita un enlace por correo. La ruta
+`/#/reset-password?token=...` retira el token de la URL al abrirse y permite elegir
+una contraseña nueva. El enlace vence, se consume una sola vez y el cambio
+invalida sesiones anteriores. No se guarda el token en almacenamiento web.
+
+SMTP queda pendiente de configuración privada del backend; ver `backend/README.md`.
+Sin configuración la interfaz informa que el servicio no está disponible.
+No se envían correos reales durante las pruebas.
+
+Para comprobar los recorridos completos, desde la raíz, después de compilar:
+
+```powershell
+.\.venv\Scripts\python.exe frontend/tests/customer_browser.py
+.\.venv\Scripts\python.exe frontend/tests/admin_browser.py
+.\.venv\Scripts\python.exe frontend/tests/recovery_browser.py
+```
+
+Ejecutarlos uno por vez porque comparten puertos de pruebas. Usan SQLite en
+memoria, imágenes y correo simulados. No leen ni modifican bases del usuario
+ni servicios de producción.

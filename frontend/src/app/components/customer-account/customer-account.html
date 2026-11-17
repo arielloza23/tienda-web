@@ -6,6 +6,17 @@
     <button type="button" (click)="auth.logout(); notice.set('Sesión cerrada.')">Cerrar sesión</button>
   } @else {
     <p>Puedes comprar sin crear una cuenta.</p>
+    @if (forgot()) {
+      <h3>Recuperar contraseña</h3>
+      <p>Te enviaremos un enlace para elegir una contraseña nueva.</p>
+      <form (ngSubmit)="requestRecovery()" ngNativeValidate>
+        <fieldset [disabled]="busy()">
+          <label>Correo electrónico<input type="email" name="recovery_email" [(ngModel)]="email" required maxlength="320" autocomplete="email" /></label>
+          <button type="submit">{{ busy() ? 'Solicitando…' : 'Enviar enlace' }}</button>
+          <button type="button" class="secondary" (click)="recoveryMode(false)">Volver a iniciar sesión</button>
+        </fieldset>
+      </form>
+    } @else {
     <h3>{{ signup() ? 'Crear cuenta' : 'Iniciar sesión' }}</h3>
     <form (ngSubmit)="submit()">
       <fieldset [disabled]="busy()">
@@ -17,8 +28,10 @@
         <label>Contraseña<input type="password" name="password" [(ngModel)]="password" required [minlength]="signup() ? 8 : 1" maxlength="128" [autocomplete]="signup() ? 'new-password' : 'current-password'" /></label>
         <button type="submit">{{ busy() ? 'Procesando…' : signup() ? 'Registrarme' : 'Iniciar sesión' }}</button>
         <button type="button" class="secondary" (click)="changeMode()">{{ signup() ? 'Ya tengo cuenta' : 'Crear cuenta' }}</button>
+        @if (!signup()) { <button type="button" class="forgot-link" (click)="recoveryMode(true)">Olvidé mi contraseña</button> }
       </fieldset>
     </form>
+    }
   }
   @if (error()) { <p role="alert">{{ error() }}</p> }
   @if (notice()) { <p role="status">{{ notice() }}</p> }

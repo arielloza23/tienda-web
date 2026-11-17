@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, decode_token_version
 from app.db.session import get_db
 from app.models.user import User, UserRole
 
@@ -27,7 +27,7 @@ def get_current_user(
         raise unauthorized
 
     user = db.get(User, user_id)
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or user.token_version != decode_token_version(credentials.credentials):
         raise unauthorized
     return user
 

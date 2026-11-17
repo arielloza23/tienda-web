@@ -9,6 +9,10 @@ class ProductVariantBase(BaseModel):
     color: Optional[str] = Field(default=None, max_length=50)
     price_adjustment_cents: int = Field(default=0, ge=0, le=2147483647, strict=True)
 
+    bust_cm: float | None = Field(default=None, gt=0, le=300, multiple_of=0.1, allow_inf_nan=False, strict=True)
+    waist_cm: float | None = Field(default=None, gt=0, le=300, multiple_of=0.1, allow_inf_nan=False, strict=True)
+    hip_cm: float | None = Field(default=None, gt=0, le=300, multiple_of=0.1, allow_inf_nan=False, strict=True)
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
 

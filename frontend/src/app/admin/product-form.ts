@@ -3,7 +3,7 @@ import { ProductCreate, ProductUpdate } from './admin-api.service';
 
 export interface ProductDraft {
   name: string; slug: string; description: string; price: string; is_active: boolean; coverUrl: string;
-  variants: Array<{ id?: number; sku: string; size: string; color: string; adjustment: string }>;
+  variants: Array<{ id?: number; sku: string; size: string; color: string; adjustment: string; bust_cm?: string; waist_cm?: string; hip_cm?: string }>;
   images: Array<{ url: string; alt: string; color: string }>;
 }
 export function emptyProductDraft(): ProductDraft {
@@ -16,6 +16,15 @@ export function priceToCents(value: string): number {
   const cents = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
   if (!Number.isSafeInteger(cents) || cents > 2147483647) throw new Error('El importe es demasiado alto.');
   return cents;
+}
+export function measurement(value: string | undefined): number | null {
+  if (!value?.trim()) return null;
+  const normalized = value.trim().replace(',', '.');
+  const number = Number(normalized);
+  if (!/^\d+(?:\.\d)?$/.test(normalized) || number <= 0 || number > 300) {
+    throw new Error('Las medidas deben ser mayores que 0 y hasta 300 cm, con un decimal como máximo.');
+  }
+  return number;
 }
 export function productRequest(draft: ProductDraft): ProductCreate {
   const price = priceToCents(draft.price);
@@ -30,7 +39,7 @@ export function productRequest(draft: ProductDraft): ProductCreate {
     if (entry.size.trim().length > 50 || entry.color.trim().length > 50) throw new Error('La talla y el color admiten hasta 50 caracteres.');
     const adjustment = priceToCents(entry.adjustment);
     if (price + adjustment > 2147483647) throw new Error('El precio de una variante es demasiado alto.');
-    return { sku, size: entry.size.trim() || null, color: entry.color.trim() || null, price_adjustment_cents: adjustment };
+    return { sku, size: entry.size.trim() || null, color: entry.color.trim() || null, price_adjustment_cents: adjustment, bust_cm: measurement(entry.bust_cm), waist_cm: measurement(entry.waist_cm), hip_cm: measurement(entry.hip_cm) };
   });
   const colors = new Map(variants.filter((v) => v.color).map((v) => [v.color!.toLocaleLowerCase(), v.color!]));
   const seen = new Set<string>();
@@ -58,7 +67,7 @@ export function productToDraft(product: Product): ProductDraft {
     name: product.name, slug: product.slug, description: product.description || '',
     price: centsToPrice(product.price_cents), is_active: product.is_active, coverUrl: product.image_url || '',
     variants: product.variants.map((variant) => ({ id: variant.id, sku: variant.sku,
-      size: variant.size || '', color: variant.color || '', adjustment: centsToPrice(variant.price_adjustment_cents) })),
+      size: variant.size || '', color: variant.color || '', adjustment: centsToPrice(variant.price_adjustment_cents), bust_cm: variant.bust_cm == null ? '' : String(variant.bust_cm), waist_cm: variant.waist_cm == null ? '' : String(variant.waist_cm), hip_cm: variant.hip_cm == null ? '' : String(variant.hip_cm) })),
     images: (product.images || []).map(({ url, alt, color }) => ({ url, alt, color })),
   };
 }

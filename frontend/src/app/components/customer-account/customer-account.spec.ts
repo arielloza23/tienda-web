@@ -37,4 +37,17 @@ describe('Customer account dialog', async () => {
     http.expectNone(r => r.url.endsWith('/users'));
     http.expectOne(r => r.url.endsWith('/auth/login')).flush({}, { status: 401, statusText: 'Unauthorized' }); fixture.detectChanges();
   });
+  it('requests recovery without a password and shows unavailability honestly', async () => {
+    fixture.nativeElement.querySelector('button.forgot-link').click(); fixture.detectChanges(); await fixture.whenStable();
+    fill('recovery_email', 'person@example.test'); submit();
+    const request = http.expectOne(r => r.url.endsWith('/auth/forgot-password'));
+    expect(request.request.body).toEqual({ email: 'person@example.test' });
+    request.flush({}, { status: 503, statusText: 'Unavailable' }); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="alert"]').textContent).toContain('todavía no está disponible');
+    expect(fixture.nativeElement.querySelector('input[type="password"]')).toBeNull();
+    submit();
+    http.expectOne(r => r.url.endsWith('/auth/forgot-password')).flush({ message: 'Solicitud recibida.' }); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="status"]').textContent).toContain('Si existe una cuenta activa');
+  });
+
 });

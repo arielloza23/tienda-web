@@ -124,6 +124,10 @@ def update_product(db: Session, product_id: int, payload: ProductUpdate) -> Prod
             instance = ProductVariant(**values)
         else:
             instance = current[variant.id]
+            # Clientes anteriores omiten medidas: conservarlas; null explícito las borra.
+            for measure in ("bust_cm", "waist_cm", "hip_cm"):
+                if measure not in variant.model_fields_set:
+                    values.pop(measure, None)
             for field, value in values.items():
                 setattr(instance, field, value)
         variants.append(instance)

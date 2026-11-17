@@ -2,6 +2,16 @@
 <dialog #guide class="size-guide" aria-label="Guía de tallas" (cancel)="$event.preventDefault(); close()" (close)="restoreFocus()" (click)="backdrop($event)">
   <div class="guide-heading"><div><p>Encuentra tu ajuste</p><h2>Guía de tallas</h2></div><button type="button" class="close" aria-label="Cerrar guía de tallas" (click)="close()" autofocus>×</button></div>
   <p class="product-name">Para {{ productName() }}</p>
+  @if (measuredVariants().length) {
+    <h3>Contornos de la prenda en centímetros</h3>
+    <p class="measure-tip">Son medidas de la prenda, no del cuerpo. Compara con una prenda similar que te quede cómoda; no son una recomendación automática de talla.</p>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Medidas de la prenda por talla y color">
+      <table><caption>Medidas publicadas de {{ productName() }}</caption><thead><tr><th scope="col">Talla</th><th scope="col">Color</th><th scope="col">Busto (cm)</th><th scope="col">Cintura (cm)</th><th scope="col">Cadera (cm)</th></tr></thead><tbody>
+        @for (variant of variants(); track variant.id) { <tr><th scope="row">{{ variant.size || 'Sin especificar' }}</th><td>{{ variant.color || 'Sin especificar' }}</td><td>{{ measurement(variant.bust_cm) }}</td><td>{{ measurement(variant.waist_cm) }}</td><td>{{ measurement(variant.hip_cm) }}</td></tr> }
+      </tbody></table>
+    </div>
+  } @else { <p class="measure-note">La tabla de medidas específica de esta prenda todavía no está publicada. Consulta las medidas de tu talla por WhatsApp antes de confirmar.</p> }
+  <h3 class="body-heading">Cómo tomar tus medidas corporales</h3>
   <div class="measure-layout">
     <svg viewBox="0 0 180 280" role="img" aria-label="Ubicación del busto, cintura y cadera para tomar medidas" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M66 23c0 13-8 20-19 25l-16 7-12 60 15 4 13-39c-2 24 8 36 8 53 0 24-17 43-16 67l5 61h36l10-69 10 69h36l5-61c1-24-16-43-16-67 0-17 10-29 8-53l13 39 15-4-12-60-16-7c-11-5-19-12-19-25"/>
@@ -13,5 +23,5 @@
     <ol><li><h3>Busto</h3><p>Rodea la parte más amplia del busto con la cinta, sin apretar.</p></li><li><h3>Cintura</h3><p>Mide el contorno de tu cintura natural, manteniendo la cinta horizontal.</p></li><li><h3>Cadera</h3><p>Rodea la parte más amplia de la cadera, con los pies juntos.</p></li></ol>
   </div>
   <p class="measure-tip">Usa una cinta flexible sobre ropa ligera. Mantén una postura natural y anota tus medidas.</p>
-  <p class="measure-note">La tabla de medidas específica de esta prenda todavía no está publicada. Comparte tus medidas al coordinar tu pedido por WhatsApp para consultar la talla.</p>
+
 </dialog>

@@ -53,3 +53,10 @@ button:disabled,fieldset:disabled .button { cursor:wait; opacity:.55; } .order-a
 .product-row > button { grid-column:2; justify-self:start; }
 #create-title:focus-visible { outline:3px solid #74845b; outline-offset:4px; }
 .submit-button + .secondary { margin-top:12px; width:100%; }
+
+.workspace[hidden] { display:none; }
+.admin-sections { display:flex; gap:12px; margin-bottom:24px; }
+.admin-sections [aria-pressed=true] { background:#244b3a; color:white; }
+.measurement-heading { margin-top:20px; }
+.measurement-fields { grid-template-columns:repeat(3,minmax(0,1fr)); }
+@media(max-width:600px) { .measurement-fields { grid-template-columns:1fr; } }

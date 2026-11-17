@@ -9,6 +9,7 @@ export interface OrderCreateRequest {
     product_id: number;
     variant_id?: number;
     quantity: number;
+    expected_unit_price_cents?: number;
   }>;
 }
 

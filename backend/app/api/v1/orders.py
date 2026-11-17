@@ -7,7 +7,7 @@ from app.api.deps import require_admin
 from app.db.session import get_db
 from app.models.order import OrderStatus
 from app.schemas.order import OrderCreate, OrderRead
-from app.services.order_service import IdempotencyConflict, create_order, get_order_by_id, get_orders, update_order_status
+from app.services.order_service import PriceChanged, IdempotencyConflict, create_order, get_order_by_id, get_orders, update_order_status
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -33,6 +33,8 @@ def create_new_order(
 ) -> OrderRead:
     try:
         return create_order(db, payload, str(idempotency_key) if idempotency_key else None)
+    except PriceChanged as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.detail) from exc
     except IdempotencyConflict as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ValueError as exc:

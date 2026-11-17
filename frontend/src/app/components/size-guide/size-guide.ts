@@ -1,8 +1,13 @@
-import { Component, ElementRef, input, viewChild } from '@angular/core';
+import { Component, computed, ElementRef, input, viewChild } from '@angular/core';
+
+import { ProductVariant } from '../../models/product.model';
 
 @Component({ selector: 'app-size-guide', templateUrl: './size-guide.html', styleUrl: './size-guide.scss' })
 export class SizeGuide {
   readonly productName = input.required<string>();
+  readonly variants = input<ProductVariant[]>([]);
+  protected readonly measuredVariants = computed(() => this.variants().filter(v => [v.bust_cm, v.waist_cm, v.hip_cm].some(n => typeof n === 'number' && n > 0)));
+  protected measurement(value: number | null | undefined): string { return typeof value === 'number' && value > 0 ? new Intl.NumberFormat('es-EC', { maximumFractionDigits: 1 }).format(value) : 'Sin dato'; }
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('guide');
   private trigger?: HTMLButtonElement;
 

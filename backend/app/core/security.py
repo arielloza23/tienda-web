@@ -39,11 +39,11 @@ def verify_password(password: str, stored_hash: str) -> bool:
     return hmac.compare_digest(candidate.hex(), hash_hex)
 
 
-def create_access_token(user_id: int, expires_minutes: Optional[int] = None) -> str:
+def create_access_token(user_id: int, expires_minutes: Optional[int] = None, token_version: int = 0) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=expires_minutes or settings.access_token_expire_minutes
     )
-    payload = {"sub": str(user_id), "exp": expire}
+    payload = {"sub": str(user_id), "exp": expire, "ver": token_version}
     return jwt.encode(payload, settings.secret_key, algorithm=JWT_ALGORITHM)
 
 
@@ -52,4 +52,13 @@ def decode_access_token(token: str) -> Optional[int]:
         payload = jwt.decode(token, settings.secret_key, algorithms=[JWT_ALGORITHM])
         return int(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
+        return None
+
+
+def decode_token_version(token: str) -> int | None:
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[JWT_ALGORITHM])
+        version = payload.get("ver", 0)
+        return version if type(version) is int and version >= 0 else None
+    except jwt.PyJWTError:
         return None

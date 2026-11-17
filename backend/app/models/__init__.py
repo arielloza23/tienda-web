@@ -4,3 +4,5 @@ from app.models.user import User, UserRole
 from app.models.review import ProductReview
 
 __all__ = ["Order", "OrderItem", "OrderStatus", "Product", "ProductVariant", "User", "UserRole", "ProductReview"]
+
+from app.models.password_reset import PasswordResetToken

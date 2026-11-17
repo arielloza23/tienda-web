@@ -8,8 +8,9 @@ import type { DeliveryLocation } from './components/delivery-map/delivery-map';
 import { DeliveryMap } from './components/delivery-map/delivery-map';
 import { ProductShowcase } from './components/product-showcase/product-showcase';
 import { CartItem, Product, ProductVariant } from './models/product.model';
-import { OrderCreateRequest, OrderReceipt } from './models/order.model';
+import { OrderCreateRequest } from './models/order.model';
 import { CartService } from './services/cart.service';
+import { OrderReceiptService, SavedReceipt } from './services/order-receipt.service';
 import { OrderService } from './services/order.service';
 import { ProductService } from './services/product.service';
 import { CustomerAccount } from './components/customer-account/customer-account';
@@ -28,6 +29,11 @@ export class Storefront implements OnInit {
   private readonly productService = inject(ProductService);
   private readonly orderService = inject(OrderService);
   private readonly cartService = inject(CartService);
+  private readonly receiptService = inject(OrderReceiptService);
+  protected readonly lastReceipt = this.receiptService.latest;
+  protected readonly refreshingPrices = signal(false);
+  protected readonly priceRefreshFailed = signal(false);
+  protected readonly priceChanges = signal<string[]>([]);
   private readonly whatsappPhone = STORE_CONFIG.whatsappPhone.replace(/\D/g, '');
   private readonly fallbackProductImage =
     'https://images.pexels.com/photos/33114806/pexels-photo-33114806.jpeg?auto=compress&cs=tinysrgb&w=900';
@@ -55,7 +61,7 @@ export class Storefront implements OnInit {
   protected readonly isLookingUpAddress = signal(false);
   protected readonly isSubmittingOrder = signal(false);
   protected readonly checkoutError = signal<string | null>(null);
-  protected readonly orderConfirmation = signal<OrderReceipt | null>(null);
+  protected readonly orderConfirmation = signal<SavedReceipt | null>(null);
   protected readonly whatsappFollowupUrl = signal<string | null>(null);
 
   protected readonly cartCount = this.cartService.count;
@@ -169,7 +175,7 @@ export class Storefront implements OnInit {
       return;
     }
 
-    if (this.isLookingUpAddress()) return;
+    if (this.isLookingUpAddress() || this.refreshingPrices()) return;
     if (!this.deliveryLocation()) {
       this.checkoutError.set('Marca en el mapa dónde quieres recibir tu pedido.');
       return;
@@ -188,6 +194,7 @@ export class Storefront implements OnInit {
         product_id: item.product.id,
         variant_id: item.variant?.id,
         quantity: item.quantity,
+        expected_unit_price_cents: this.unitPriceCents(item),
       })),
     };
 
@@ -205,17 +212,50 @@ export class Storefront implements OnInit {
         if (whatsappWindow && whatsappUrl) {
           whatsappWindow.location.href = whatsappUrl;
         }
-        this.orderConfirmation.set(order);
+        this.receiptService.save(order);
+        this.orderConfirmation.set(this.lastReceipt());
+        this.priceChanges.set([]);
         this.cartService.clear();
         this.cartNotice.set('');
         this.isSubmittingOrder.set(false);
       },
       error: (error: HttpErrorResponse) => {
         whatsappWindow?.close();
-        this.checkoutError.set(this.checkoutErrorMessage(error));
+        if (error.status === 409 && error.error?.detail?.code === 'price_changed') {
+          const detail = error.error.detail;
+          this.priceChanges.set((Array.isArray(detail.items) ? detail.items : []).map((change: { product_id: number; variant_id: number | null; expected_unit_price_cents: number; current_unit_price_cents: number }) => {
+            const item = this.cart().find(i => i.product.id === change.product_id && (i.variant?.id ?? null) === (change.variant_id ?? null));
+            return `${item ? this.cartItemDescription(item) : 'Producto'}: antes ${this.formatPrice(change.expected_unit_price_cents)}, ahora ${this.formatPrice(change.current_unit_price_cents)} por unidad.`;
+          }));
+          this.checkoutError.set('Los precios cambiaron. Actualizamos tu pedido; revisa los importes y vuelve a confirmar para aceptarlos.');
+          this.refreshOrderPrices();
+        } else this.checkoutError.set(this.checkoutErrorMessage(error));
         this.isSubmittingOrder.set(false);
       },
     });
+  }
+
+  private refreshOrderPrices(): void {
+    this.refreshingPrices.set(true);
+    this.priceRefreshFailed.set(false);
+    this.productService.getProducts().subscribe({
+      next: products => { this.products.set(products); this.cartService.reconcile(products); this.refreshingPrices.set(false); },
+      error: () => { this.priceRefreshFailed.set(true); this.checkoutError.set('No pudimos actualizar los precios. Reintenta la actualización antes de confirmar.'); },
+    });
+  }
+
+  protected retryPrices(): void { this.refreshOrderPrices(); }
+  protected viewLastReceipt(): void {
+    const receipt = this.receiptService.current();
+    if (!receipt) return;
+    this.orderConfirmation.set(receipt);
+    this.whatsappFollowupUrl.set(this.buildWhatsAppFollowup(receipt));
+    this.openCart();
+  }
+  protected forgetReceipt(): void {
+    this.receiptService.forget();
+    this.orderConfirmation.set(null);
+    this.whatsappFollowupUrl.set(null);
   }
 
   protected startNewOrder(): void {
@@ -228,30 +268,12 @@ export class Storefront implements OnInit {
     this.whatsappFollowupUrl.set(null);
   }
 
-  private buildWhatsAppFollowup(order: OrderReceipt): string | null {
-    if (!this.whatsappPhone) {
-      return null;
-    }
-
-    const lines = order.items.map((item, index) => {
-      const variant = item.variant_label ? ` (${item.variant_label})` : '';
-      return `${index + 1}. ${item.product_name}${variant} x ${item.quantity}: ${this.formatPrice(item.total_price_cents)}`;
-    });
-    const message = [
-      `Hola, registré el pedido #${order.id} y quiero coordinar el seguimiento.`,
-      `Nombre: ${order.customer_name ?? ''}`,
-      `Teléfono: ${order.customer_phone ?? ''}`,
-      `Dirección: ${order.delivery_address ?? ''}`,
-      ...(order.delivery_latitude !== null && order.delivery_longitude !== null
-        ? [
-            `Ubicación: https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`,
-          ]
-        : []),
-      '',
-      ...lines,
-      `Total: ${this.formatPrice(order.total_cents)}`,
-    ].join('\n');
-
+  private buildWhatsAppFollowup(order: SavedReceipt): string | null {
+    if (!this.whatsappPhone) return null;
+    const lines = order.items.map((item, index) => `${index + 1}. ${item.product_name}${item.variant_label ? ` (${item.variant_label})` : ''} x ${item.quantity}: ${this.formatPrice(item.total_price_cents)}`);
+    const message = [`Hola, registré el pedido #${order.id} y quiero coordinar mi pedido.`, '', ...lines,
+      `Subtotal de productos: ${this.formatPrice(order.subtotal_cents)}`,
+      'Envío y pago: por coordinar por WhatsApp.'].join('\n');
     return `https://wa.me/${this.whatsappPhone}?text=${encodeURIComponent(message)}`;
   }
 

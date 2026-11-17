@@ -1,6 +1,7 @@
+from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -52,5 +53,9 @@ class ProductVariant(Base):
     size: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     color: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     price_adjustment_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    bust_cm: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 1), nullable=True)
+    waist_cm: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 1), nullable=True)
+    hip_cm: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 1), nullable=True)
 
     product: Mapped[Product] = relationship(back_populates="variants")

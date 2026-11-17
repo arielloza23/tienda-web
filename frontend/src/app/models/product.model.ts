@@ -4,6 +4,10 @@ export interface ProductVariant {
   size?: string | null;
   color?: string | null;
   price_adjustment_cents: number;
+  /** Contornos de la prenda en centímetros; no son medidas corporales recomendadas. */
+  bust_cm?: number | null;
+  waist_cm?: number | null;
+  hip_cm?: number | null;
 }
 
 export interface ProductImage {

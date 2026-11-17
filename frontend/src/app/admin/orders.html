@@ -1,0 +1,36 @@
+<section class="orders" aria-labelledby="orders-title" [attr.aria-busy]="busy()">
+  <header class="heading"><div><p class="eyebrow">Atención al cliente</p><h2 id="orders-title">Pedidos</h2></div><button type="button" (click)="refresh()" [disabled]="busy()">Actualizar pedidos</button></header>
+  @if (error()) { <p class="notice error" role="alert">{{ error() }}</p> }
+  @if (success()) { <p class="notice success" role="status">{{ success() }}</p> }
+  <label for="order-filter">Filtrar por estado</label>
+  <select id="order-filter" [ngModel]="filter()" (ngModelChange)="filter.set($event)" [disabled]="busy()"><option value="">Todos los estados</option>@for (status of statuses; track status) { <option [value]="status">{{ labels[status] }}</option> }</select>
+  @if (loading()) { <p role="status" class="empty">Cargando pedidos…</p> }
+  <div class="order-workspace">
+    <ul class="order-list" aria-label="Lista de pedidos">
+      @for (order of filtered(); track order.id) {
+        <li><button type="button" class="order-row" [attr.aria-pressed]="selectedId() === order.id" (click)="select(order.id)" [disabled]="busy()">
+          <span><strong>Pedido #{{ order.id }}</strong><time>{{ order.created_at | date:'dd/MM/yyyy HH:mm' }}</time></span>
+          <span class="customer">{{ order.customer_name || 'Sin nombre' }}</span>
+          <span><span>Subtotal {{ order.subtotal_cents / 100 | currency:'USD':'symbol':'1.2-2' }}</span><span class="badge">{{ labels[order.status] }}</span></span>
+        </button></li>
+      } @empty { @if (!loading()) { <li class="empty">{{ filter() ? 'No hay pedidos con este estado.' : 'Todavía no hay pedidos.' }}</li> } }
+    </ul>
+    @if (selected(); as order) {
+      <section class="detail" aria-labelledby="order-detail-title">
+        <h3 id="order-detail-title">Pedido #{{ order.id }} · {{ labels[order.status] }}</h3>
+        <p class="muted">{{ order.created_at | date:'dd/MM/yyyy HH:mm' }}</p>
+        <dl><dt>Cliente</dt><dd>{{ order.customer_name || 'Sin nombre' }}</dd><dt>Teléfono</dt><dd>{{ order.customer_phone || 'No registrado' }}</dd><dt>Entrega</dt><dd>{{ order.delivery_address || 'No registrada' }}</dd></dl>
+        @if (order.delivery_latitude != null && order.delivery_longitude != null) { <p class="muted">Ubicación: {{ order.delivery_latitude }}, {{ order.delivery_longitude }}</p> }
+        <h4>Artículos</h4><ul class="items">@for (item of order.items; track item.id) { <li><strong>{{ item.product_name }}</strong>@if (item.variant_label) { <span>{{ item.variant_label }}</span> }<span>{{ item.quantity }} × {{ item.unit_price_cents / 100 | currency:'USD':'symbol':'1.2-2' }} = {{ item.total_price_cents / 100 | currency:'USD':'symbol':'1.2-2' }}</span></li> }</ul>
+        <dl class="totals"><dt>Subtotal de productos</dt><dd>{{ order.subtotal_cents / 100 | currency:'USD':'symbol':'1.2-2' }}</dd><dt>Envío registrado</dt><dd>{{ order.shipping_total_cents / 100 | currency:'USD':'symbol':'1.2-2' }}</dd><dt>Impuestos registrados</dt><dd>{{ order.tax_total_cents / 100 | currency:'USD':'symbol':'1.2-2' }}</dd><dt>Total registrado</dt><dd>{{ order.total_cents / 100 | currency:'USD':'symbol':'1.2-2' }}</dd></dl>
+        <p class="muted">Confirma el pago con el cliente antes de marcarlo como pagado.</p>
+        @if (cancelling()) {
+          <div class="cancel-confirm" role="group" aria-label="Confirmar cancelación"><p>¿Cancelar el pedido #{{ order.id }}? Esta acción no se puede deshacer.</p><button type="button" class="danger" (click)="changeStatus('cancelled', true)" [disabled]="busy()">Sí, cancelar pedido</button><button type="button" (click)="cancelling.set(false)" [disabled]="busy()">Conservar pedido</button></div>
+        } @else {
+          <div class="actions">@for (status of transitions(order); track status) { <button type="button" [class.danger]="status === 'cancelled'" (click)="changeStatus(status)" [disabled]="busy()">{{ actions[status] }}</button> } @empty { <p class="muted">Este pedido tiene un estado final.</p> }</div>
+        }
+        @if (updating()) { <p role="status">Actualizando estado…</p> }
+      </section>
+    } @else { <p class="empty">Selecciona un pedido para consultar sus detalles.</p> }
+  </div>
+</section>

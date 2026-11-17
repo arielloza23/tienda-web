@@ -155,7 +155,7 @@ def test_reviews_migration_preserves_existing_data_and_constraints(alembic_db):
         connection.execute(text("INSERT INTO users (id, email, full_name, password_hash, role, is_active) VALUES (800, 'migration@example.com', 'Temporal', 'fake', 'customer', 1)"))
         connection.execute(text("INSERT INTO orders (id, status, subtotal_cents, total_cents, shipping_total_cents, tax_total_cents, created_at) VALUES (800, 'pending', 700, 700, 0, 0, CURRENT_TIMESTAMP)"))
         product_count = connection.execute(text("SELECT COUNT(*) FROM products")).scalar_one()
-    command.upgrade(config, "head")
+    command.upgrade(config, "20261115_product_reviews")
     statement = text("INSERT INTO product_reviews (product_id, user_id, rating, comment, created_at, updated_at) VALUES (:product_id, 800, :rating, '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
     with engine.begin() as connection:
         connection.execute(statement, {"product_id": product_id, "rating": 5})
@@ -177,4 +177,25 @@ def test_reviews_migration_preserves_existing_data_and_constraints(alembic_db):
         assert connection.execute(text("SELECT email FROM users WHERE id=800")).scalar_one() == 'migration@example.com'
         assert connection.execute(text("SELECT total_cents FROM orders WHERE id=800")).scalar_one() == 700
     command.upgrade(config, "head")
+    assert _schema_diff(engine) == []
+
+
+def test_checkout_recovery_preserves_data_on_upgrade_and_reupgrade(alembic_db):
+    config, engine = alembic_db
+    command.upgrade(config, "20261115_product_reviews")
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO users (id, email, full_name, password_hash, role, is_active) VALUES (999, 'temp@example.com', 'Temporal', 'fake', 'customer', 1)"))
+        connection.execute(text("INSERT INTO orders (id, status, subtotal_cents, total_cents, shipping_total_cents, tax_total_cents, created_at) VALUES (999, 'pending', 100, 100, 0, 0, CURRENT_TIMESTAMP)"))
+        before = connection.execute(text("SELECT id, sku, size, color FROM product_variants ORDER BY id")).all()
+    command.upgrade(config, "20261116_checkout_recovery")
+    with engine.begin() as connection:
+        assert connection.execute(text("SELECT token_version FROM users WHERE id=999")).scalar_one() == 0
+        assert connection.execute(text("SELECT COUNT(*) FROM product_variants WHERE bust_cm IS NOT NULL OR waist_cm IS NOT NULL OR hip_cm IS NOT NULL")).scalar_one() == 0
+        connection.execute(text("UPDATE product_variants SET bust_cm=90.5 WHERE id=:id"), {"id": before[0].id})
+    command.downgrade(config, "20261115_product_reviews")
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT id, sku, size, color FROM product_variants ORDER BY id")).all() == before
+        assert connection.execute(text("SELECT total_cents FROM orders WHERE id=999")).scalar_one() == 100
+        assert connection.execute(text("SELECT email FROM users WHERE id=999")).scalar_one() == "temp@example.com"
+    command.upgrade(config, "20261116_checkout_recovery")
     assert _schema_diff(engine) == []

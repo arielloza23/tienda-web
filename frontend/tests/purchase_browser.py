@@ -12,7 +12,7 @@ products = [{
     "price_cents": 1200, "image_url": "https://images.test/cover.webp",
     "images": [{"id": 1, "url": "https://images.test/red.webp", "alt": "Detalle rojo", "color": " rojo "},
                {"id": 2, "url": "https://images.test/blue.webp", "alt": "Detalle azul", "color": "Azul"}],
-    "variants": [{"id": 11, "sku": "M-RED", "size": "M", "color": "Rojo", "price_adjustment_cents": 0},
+    "variants": [{"id": 11, "sku": "M-RED", "size": "M", "color": "Rojo", "price_adjustment_cents": 0, "bust_cm": 92.5, "waist_cm": 74, "hip_cm": 98},
                  {"id": 12, "sku": "M-BLUE", "size": "M", "color": "Azul", "price_adjustment_cents": 200},
                  {"id": 13, "sku": "L-BLUE", "size": "L", "color": "Azul", "price_adjustment_cents": 300}],
 }, {"id": 2, "name": "Pieza sin opciones", "slug": "pieza", "is_active": True,
@@ -44,7 +44,8 @@ try:
         expect(guide).to_contain_text("Conjunto de prueba")
         for label in ("Busto", "Cintura", "Cadera"):
             expect(guide.get_by_role("heading", name=label, exact=True)).to_be_visible()
-        expect(guide).to_contain_text("todavía no está publicada")
+        expect(guide.get_by_role("table")).to_contain_text("92,5")
+        expect(guide).to_contain_text("Son medidas de la prenda, no del cuerpo")
         for width in (320, 390):
             page.set_viewport_size({"width": width, "height": 844})
             assert guide.evaluate("e => e.scrollWidth <= e.clientWidth"), width
@@ -88,6 +89,10 @@ try:
         page.screenshot(path=".local-backups/purchase-cart-mobile.png")
         cart.get_by_role("button", name="Cerrar pedido", exact=True).click()
         page.locator(".stage-arrow-next").click()
+        guide_trigger.click()
+        expect(guide).to_contain_text("todavía no está publicada")
+        expect(guide.get_by_role("table")).to_have_count(0)
+        guide.press("Escape")
         expect(add).to_be_enabled()
         page.locator(".stage-arrow-prev").click()
         expect(add).to_be_disabled()

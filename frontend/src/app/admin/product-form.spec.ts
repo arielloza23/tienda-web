@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { emptyProductDraft, priceToCents, productRequest, productToDraft, productUpdateRequest } from './product-form';
+import { emptyProductDraft, priceToCents, productRequest, productToDraft, productUpdateRequest, measurement } from './product-form';
 
 describe('Product form', () => {
+  it('validates optional garment measurements without rounding and preserves them on update', () => {
+    expect(measurement('')).toBeNull(); expect(measurement(undefined)).toBeNull();
+    expect(measurement(' 86,5 ')).toBe(86.5); expect(measurement('300')).toBe(300);
+    for (const value of ['0', '-2', '300.1', '85.55', '1e2', 'Infinity']) expect(() => measurement(value)).toThrow();
+    const product = { id: 7, name: 'Body', slug: 'body-vino', price_cents: 1500, is_active: true,
+      variants: [{ id: 23, sku: 'BODY-M', size: 'M', color: 'Vino', price_adjustment_cents: 0, bust_cm: 86.5, waist_cm: null, hip_cm: 98 }] };
+    const draft = productToDraft(product);
+    expect(draft.variants[0].bust_cm).toBe('86.5');
+    expect(productUpdateRequest(draft).variants[0]).toMatchObject({ id: 23, bust_cm: 86.5, waist_cm: null, hip_cm: 98 });
+    draft.variants[0].bust_cm = '';
+    expect(productUpdateRequest(draft).variants[0].bust_cm).toBeNull();
+    expect(product.variants[0].bust_cm).toBe(86.5);
+  });
   it('copies editable products without mutating them and retains IDs only for updates', () => {
     const product = { id: 7, name: 'Body', slug: 'body-vino', price_cents: 2147483647, is_active: false,
       image_url: 'https://cdn.example/cover.webp',

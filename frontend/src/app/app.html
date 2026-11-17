@@ -9,6 +9,7 @@
       <a class="nav-link" href="#catalog" (click)="scrollToSection($event, 'catalog')">Catálogo</a>
       <a class="nav-link how-link" href="#how-it-works" (click)="scrollToSection($event, 'how-it-works')">Cómo comprar</a>
       <button type="button" class="nav-link account-link" (click)="customerAuth.open()" aria-haspopup="dialog">Mi cuenta</button>
+      @if (lastReceipt()) { <button type="button" class="nav-link" (click)="viewLastReceipt()">Último pedido</button> }
       <button type="button" class="cart-link" (click)="openCart()" aria-haspopup="dialog">
         Tu pedido <span class="cart-count">{{ cartCount() }}</span>
       </button>
@@ -68,23 +69,26 @@
           @if (orderConfirmation(); as confirmation) {
             <section class="order-confirmation" role="status" aria-live="polite">
               <p class="cart-eyebrow">Pedido recibido</p>
-              <h3>Gracias, {{ confirmation.customer_name }}.</h3>
+              <h3>Resumen del pedido #{{ confirmation.id }}</h3>
               <p>Registramos tu pedido con el número <strong>#{{ confirmation.id }}</strong>.</p>
               <div class="confirmation-total">
                 <span>Subtotal de productos</span>
-                <strong>{{ confirmation.total_cents / 100 | currency: 'USD' }}</strong>
+                <strong>{{ confirmation.subtotal_cents / 100 | currency: 'USD' }}</strong>
               </div>
-              <p class="confirmation-note">Envío: por coordinar por WhatsApp.</p>
+              <ul class="receipt-items">@for (item of confirmation.items; track $index) { <li>{{ item.product_name }} {{ item.variant_label ? '(' + item.variant_label + ')' : '' }} × {{ item.quantity }} — {{ item.total_price_cents / 100 | currency: 'USD' }}</li> }</ul>
+              <p class="confirmation-note">Envío y pago: por coordinar por WhatsApp.</p>
+              <p class="confirmation-note">Comprobante guardado en esta pestaña durante 24 horas. Estado al registrar: {{ confirmation.status }}. Este resumen no muestra seguimiento en vivo.</p>
               <p class="confirmation-note">
                 Tu pedido ya está registrado. Abre el enlace para compartir el resumen por WhatsApp y coordinar el seguimiento.
               </p>
               @if (whatsappFollowupUrl(); as whatsappUrl) {
                 <a class="whatsapp-confirmation-link" [href]="whatsappUrl" target="_blank" rel="noopener noreferrer">
-                  Abrir seguimiento en WhatsApp <span aria-hidden="true">↗</span>
+                  Compartir resumen por WhatsApp <span aria-hidden="true">↗</span>
                 </a>
               }
               <p class="confirmation-note">Revisa el mensaje en WhatsApp y pulsa Enviar para contactar al negocio.</p>
               <button type="button" class="clear-cart" (click)="startNewOrder(); closeCart()">Volver al catálogo</button>
+              <button type="button" class="clear-cart" (click)="forgetReceipt()">Olvidar comprobante</button>
             </section>
           } @else if (cart().length === 0) {
             <div class="empty-cart"><span class="empty-cart-symbol" aria-hidden="true">＋</span><h3>Un espacio para tus favoritos.</h3><p>Elige una pieza y tu talla. Aquí empieza tu próximo pedido.</p><a href="#catalog" (click)="scrollToSection($event, 'catalog'); closeCart()">Explorar la colección ↗</a></div>
@@ -136,7 +140,7 @@
               <strong>{{ cartSubtotalCents() / 100 | currency: 'USD' }}</strong>
             </div>
 
-            <p class="cart-shipping"><span>Envío</span><span>Por coordinar por WhatsApp</span></p>
+            <p class="cart-shipping"><span>Envío y pago</span><span>Por coordinar por WhatsApp</span></p>
 
             <form class="checkout-form" ngNativeValidate (ngSubmit)="placeOrder()">
               <fieldset class="checkout-fields" [disabled]="isSubmittingOrder()">
@@ -204,14 +208,18 @@
               ></textarea>
               <small id="delivery-address-hint">Revisa la dirección detectada y añade casa, departamento o una referencia.</small>
 
+              @if (priceChanges().length) {
+                <div class="checkout-note" role="status"><strong>Revisa los nuevos precios</strong><ul>@for (change of priceChanges(); track $index) { <li>{{ change }}</li> }</ul></div>
+              }
+              @if (refreshingPrices()) { <p class="checkout-note" role="status">Actualizando precios…</p>@if (priceRefreshFailed()) { <button type="button" class="retry-button" (click)="retryPrices()">Reintentar actualización</button> } }
               @if (checkoutError()) {
                 <p class="checkout-error" role="alert">{{ checkoutError() }}</p>
               }
 
-              <button type="submit" class="checkout-button" [disabled]="isSubmittingOrder() || isLookingUpAddress()">
-                {{ isSubmittingOrder() ? 'Registrando pedido...' : isLookingUpAddress() ? 'Buscando dirección...' : 'Confirmar mi pedido' }} <span aria-hidden="true">↗</span>
+              <button type="submit" class="checkout-button" [disabled]="isSubmittingOrder() || isLookingUpAddress() || refreshingPrices()">
+                {{ isSubmittingOrder() ? 'Registrando pedido...' : isLookingUpAddress() ? 'Buscando dirección...' : refreshingPrices() ? 'Actualizando precios...' : priceChanges().length ? 'Aceptar precios y confirmar' : 'Confirmar mi pedido' }} <span aria-hidden="true">↗</span>
               </button>
-              <p class="checkout-note">Después podrás compartir tu pedido por WhatsApp y coordinar el envío.</p>
+              <p class="checkout-note">Después podrás compartir tu pedido por WhatsApp y coordinar el envío y el pago.</p>
               </fieldset>
             </form>
             <button type="button" class="clear-cart" [disabled]="isSubmittingOrder()" (click)="clearCart()">Vaciar pedido</button>

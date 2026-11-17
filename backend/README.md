@@ -243,3 +243,59 @@ sin modificar pedidos o productos existentes. Se valida en bases temporales.
 Antes de publicar hay que respaldar la base y ejecutar `alembic upgrade head`.
 Un downgrade de esta revisión elimina las reseñas; no se usa sobre datos reales
 como mecanismo de prueba. Moderación y verificación de correo no están incluidas.
+
+
+## Confirmación de precios, medidas y recuperación de acceso
+
+`POST /orders` admite `expected_unit_price_cents` opcional por línea (entero estricto
+entre 0 y 2147483647). El servidor sigue calculando el importe. Si difiere, devuelve
+409 con `detail.code = "price_changed"`, `message`, `items` (producto, variante,
+precio esperado y actual) y `subtotal_cents` actual, sin crear ningún pedido.
+El cliente debe mostrar el cambio y pedir otra confirmación. Los reintentos con una
+clave ya registrada devuelven el pedido original antes de consultar precios.
+Las solicitudes antiguas sin precio esperado conservan su hash de idempotencia.
+En PostgreSQL, creación y edición bloquean el mismo producto hasta terminar para
+que una edición concurrente no cambie el importe durante la confirmación.
+
+Cada variante admite `bust_cm`, `waist_cm` y `hip_cm`, números opcionales mayores
+que cero y hasta 300, con un decimal como máximo. Son **contornos de la prenda**
+en centímetros, no medidas corporales ni una tabla inventada por talla. No se
+rellenan automáticamente datos existentes. Enviar `null` elimina una medida.
+
+- `POST /auth/forgot-password`, `{ "email": "cliente@example.com" }`: 202 con
+  mensaje genérico para cuentas existentes, inactivas o desconocidas. Sin SMTP
+  configurado devuelve 503 para todos; no afirma haber enviado un correo.
+- `POST /auth/reset-password`, `{ "token": "...", "password": "..." }`: cambia
+  la contraseña (8 a 128 caracteres), devuelve 200 con `message`; un enlace
+  inexistente, usado o vencido devuelve 400 con un mensaje genérico.
+
+Configura `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASSWORD`
+(secreto) y `SMTP_STARTTLS=true` para el puerto 587. Con `SMTP_STARTTLS=false`
+solo se permite SMTP sobre TLS en el puerto 465. Se verifica el certificado TLS.
+`PASSWORD_RESET_URL` debe ser la URL fija de tu frontend terminada en
+`/#/reset-password`, sin parámetros: el backend agrega el token al fragmento.
+Se permite HTTP únicamente para localhost. Estas variables se preparan en
+`.env.example`; las pruebas simulan el transporte y no envían correo real.
+El envío se ejecuta después de responder 202, sin compartir la sesión de base de
+datos ni exponer por latencia SMTP si existe el correo. Es una tarea en memoria:
+un reinicio puede interrumpirla; el cliente puede solicitar otro enlace.
+Si el proveedor falla, se conserva la respuesta genérica y el log no expone
+correos, tokens ni URLs; se puede volver a solicitar después de un minuto.
+
+Los enlaces duran 30 minutos, son de un solo uso y se almacena únicamente su
+SHA-256. Una nueva solicitud revoca los enlaces anteriores. El cambio invalida
+las sesiones JWT previas de esa cuenta. Hay un intervalo mínimo de 60 segundos
+por cuenta y un límite básico de diez solicitudes por hora y dirección de red,
+sin revelar la existencia de la cuenta. El límite por dirección está en memoria
+por proceso: una instalación con varios procesos debe añadir un límite común
+en el proxy o proveedor. No hay envío ni configuración automática del proveedor.
+
+La migración `20261116_checkout_recovery` conserva productos, pedidos y usuarios,
+añade columnas opcionales, una versión de sesión y la tabla de enlaces de
+recuperación. Upgrade/downgrade/reupgrade se valida solo en bases temporales.
+El downgrade descarta las medidas y los enlaces de recuperación: no se usa
+sobre una base real como prueba.
+
+Las transiciones administrativas de pedidos se guardan con comparación del estado
+previo: si otro administrador lo cambió simultáneamente, se rechaza el segundo
+cambio y se solicita actualizar la bandeja. No sobrescribe una cancelación o envío.

@@ -98,11 +98,37 @@ try:
         page.locator(".delivery-location-field").scroll_into_view_if_needed()
         page.get_by_role("button", name="Marcar centro", exact=True).click()
         expect(page.get_by_label("Dirección de entrega", exact=True)).to_have_value("Calle de prueba, Quito, Ecuador")
+        # El catálogo cambia mientras el comprador rellena los datos: no crear aún.
+        with sessions() as db:
+            db.get(Product, 1).price_cents = 1300
+            db.commit()
         page.get_by_role("button", name="Confirmar mi pedido").click()
+        expect(page.locator(".checkout-error")).to_contain_text("Los precios cambiaron")
+        expect(page.locator(".cart-total")).to_contain_text("13.00")
+        expect(page.get_by_label("Nombre y apellido")).to_have_value("Cliente invitado")
+        expect(page.get_by_label("Dirección de entrega", exact=True)).to_have_value("Calle de prueba, Quito, Ecuador")
+        with sessions() as db:
+            assert db.scalars(select(Order)).first() is None
+        page.get_by_role("button", name="Aceptar precios y confirmar", exact=True).click()
         expect(page.get_by_text("Pedido recibido", exact=True)).to_be_visible()
         with sessions() as db:
             order = db.scalars(select(Order)).one()
-            assert order.user_id is None and order.total_cents == 1000
+            assert order.user_id is None and order.total_cents == 1300
+        receipt_id = order.id
+        saved = page.evaluate("sessionStorage.getItem('tienda.receipt.v1')")
+        assert saved and all(value not in saved for value in ('Cliente invitado', '0991234567', 'Calle de prueba', 'customer_phone', 'delivery_address', 'wa.me'))
+        page.get_by_role("button", name="Volver al catálogo", exact=True).click()
+        page.reload()
+        page.get_by_role("button", name="Último pedido", exact=True).click()
+        expect(page.get_by_role("heading", name=f"Resumen del pedido #{receipt_id}", exact=True)).to_be_visible()
+        expect(page.locator(".confirmation-total")).to_contain_text("13.00")
+        recovered_link = page.locator('.whatsapp-confirmation-link').get_attribute('href')
+        from urllib.parse import unquote
+        decoded = unquote(recovered_link)
+        assert 'Subtotal de productos' in decoded and 'Envío y pago' in decoded
+        assert all(value not in decoded for value in ('Cliente invitado','0991234567','Calle de prueba'))
+        page.get_by_role("button", name="Olvidar comprobante", exact=True).click()
+        assert page.evaluate("sessionStorage.getItem('tienda.receipt.v1')") is None
         page.get_by_role("button", name="Cerrar pedido", exact=True).click()
         expect(page.locator("app-product-reviews")).to_have_count(0)
         page.get_by_role("button", name="Ver opiniones de Producto base", exact=True).click()
@@ -172,7 +198,7 @@ try:
         expect(page.get_by_role("button", name="Ver opiniones de Producto base", exact=True)).to_be_focused()
         assert not errors, errors
         browser.close()
-        print("CUSTOMER_BROWSER_OK: guest checkout, signup/login/logout, review 1..5, update without duplicate, public reading, product isolation, mobile layout.")
+        print("CUSTOMER_BROWSER_OK: price reconfirmation, safe receipt recovery, guest checkout, signup/login/logout, review 1..5, update without duplicate, public reading, product isolation, mobile layout.")
 finally:
     server.should_exit = True; static.shutdown(); static.server_close()
     for thread in threads: thread.join(timeout=10)

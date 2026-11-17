@@ -21,6 +21,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.user import User
+from app.models.order import Order
 from app.models.product import Product
 from app.services import image_service
 from playwright.sync_api import sync_playwright, expect
@@ -92,6 +93,9 @@ try:
         page.get_by_label("Talla", exact=True).fill("M")
         page.get_by_label("Color", exact=True).fill("Vino")
         page.get_by_label("Importe adicional (USD)").fill("2.00")
+        page.locator('#bust_cm-0').fill('92.5')
+        page.locator('#waist_cm-0').fill('74')
+        page.locator('#hip_cm-0').fill('98')
         page.locator("#cover-file").set_input_files(str(photo))
         expect(page.locator(".cover-preview img")).to_be_visible()
         page.get_by_role("button", name="Agregar foto").click()
@@ -105,6 +109,8 @@ try:
             created = db.scalars(select(Product).where(Product.slug == "body-de-prueba")).one()
             assert created.price_cents == 1550 and not created.is_active
             assert created.variants[0].price_adjustment_cents == 200 and created.images[0].color == "Vino"
+            assert float(created.variants[0].bust_cm) == 92.5
+            assert float(created.variants[0].waist_cm) == 74
             original_id = created.id
             original_variant_id = created.variants[0].id
             original_cover = created.image_url
@@ -113,6 +119,7 @@ try:
         row.get_by_role("button", name="Editar", exact=True).click()
         expect(page.get_by_role("heading", name="Editar producto", exact=True)).to_be_visible()
         expect(page.get_by_label("Nombre", exact=True)).to_have_value("Body de prueba")
+        expect(page.locator('#bust_cm-0')).to_have_value('92.5')
         expect(page.get_by_label("Precio base (USD)")).to_have_value("15.50")
         expect(page.locator(".gallery-preview")).to_be_visible()
         page.get_by_label("Nombre", exact=True).fill("Cambio sin guardar")
@@ -152,11 +159,40 @@ try:
         expect(page.get_by_role("heading", name="Crear producto", exact=True)).to_be_visible()
         page.set_viewport_size({"width": 390, "height": 844})
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        # Crear un pedido invitado temporal y atenderlo desde el administrador.
+        response = page.request.post('http://127.0.0.1:8123/api/v1/orders', data={
+            'customer_name': 'Cliente temporal', 'customer_phone': '0991234567',
+            'delivery_address': 'Dirección temporal de prueba',
+            'items': [{'product_id': 1, 'quantity': 1, 'expected_unit_price_cents': 1000}],
+        })
+        assert response.status == 201, response.status
+        order_id = response.json()['id']
+        page.get_by_role('button',name='Pedidos',exact=True).click()
+        expect(page.get_by_role('heading',name='Crear producto',exact=True)).not_to_be_visible()
+        page.locator('button.order-row').filter(has_text=f'Pedido #{order_id}').click()
+        expect(page.locator('.detail')).to_contain_text('Cliente temporal')
+        page.get_by_role('button',name='Cancelar pedido',exact=True).click()
+        expect(page.get_by_role('button',name='Sí, cancelar pedido',exact=True)).to_be_visible()
+        page.get_by_role('button',name='Conservar pedido',exact=True).click()
+        page.get_by_role('button',name='Marcar como pagado',exact=True).click()
+        expect(page.locator('.detail h3')).to_contain_text('Pagado')
+        page.get_by_role('button',name='Marcar como enviado',exact=True).click()
+        expect(page.locator('.detail h3')).to_contain_text('Enviado')
+        page.get_by_role('button',name='Marcar como entregado',exact=True).click()
+        expect(page.locator('.detail h3')).to_contain_text('Entregado')
+        expect(page.locator('.detail')).to_contain_text('estado final')
+        page.locator('#order-filter').select_option('pending')
+        expect(page.locator('button.order-row')).to_have_count(0)
+        page.locator('#order-filter').select_option('delivered')
+        expect(page.locator('button.order-row')).to_have_count(1)
+        with sessions() as db:
+            assert db.get(Order,order_id).status == 'delivered'
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         page.get_by_role("button", name="Cerrar sesión").click()
         expect(page.get_by_role("button", name="Iniciar sesión")).to_be_visible()
         assert not errors, errors
         browser.close()
-        print("BROWSER_OK: admin login, two file uploads, product creation and editing, cancel, conflict recovery, preserved variants/photos, hash links, mobile layout, logout.")
+        print("BROWSER_OK: admin order transitions, variant measurements, admin login, two file uploads, product creation and editing, cancel, conflict recovery, preserved variants/photos, hash links, mobile layout, logout.")
 finally:
     server.should_exit = True; static.shutdown(); static.server_close()
     for thread in threads: thread.join(timeout=10)

@@ -8,14 +8,17 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Product } from '../models/product.model';
 import { AdminAuth } from './auth.service';
+import { AdminOrders } from './orders';
 import { AdminApi } from './admin-api.service';
 import { emptyProductDraft, productRequest, productToDraft, productUpdateRequest } from './product-form';
 
-@Component({ imports: [CommonModule, FormsModule, RouterLink], templateUrl: './admin.html', styleUrl: './admin.scss' })
+@Component({ imports: [CommonModule, FormsModule, RouterLink, AdminOrders], templateUrl: './admin.html', styleUrl: './admin.scss' })
 export class Admin implements OnInit {
   protected readonly auth = inject(AdminAuth);
   private readonly api = inject(AdminApi);
   private readonly destroyRef = inject(DestroyRef);
+  protected readonly section = signal<'products' | 'orders'>('products');
+  protected readonly measurementFields = [{ key: 'bust_cm', label: 'Busto' }, { key: 'waist_cm', label: 'Cintura' }, { key: 'hip_cm', label: 'Cadera' }] as const;
   protected loginEmail = '';
   protected loginPassword = '';
   protected readonly loggingIn = signal(false);
@@ -114,6 +117,7 @@ export class Admin implements OnInit {
   private showError(error: unknown): void {
     let message = 'No se pudo completar la operación. Inténtalo nuevamente.';
     if (error instanceof HttpErrorResponse) {
+      if (error.status === 401 || error.status === 403) { this.products.set([]); this.resetEditor(); }
       if (error.status === 401) message = 'La sesión venció o los datos de acceso son incorrectos. Inicia sesión nuevamente.';
       else if (error.status === 403) message = 'Esta cuenta no tiene permisos de administración.';
       else if (typeof error.error?.detail === 'string') message = error.error.detail;

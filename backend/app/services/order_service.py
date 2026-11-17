@@ -2,6 +2,7 @@ import hashlib
 import json
 from typing import Optional
 
+from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,7 +16,12 @@ def get_orders(db: Session) -> list[Order]:
 
 
 def get_order_by_id(db: Session, order_id: int) -> Optional[Order]:
-    return db.query(Order).filter(Order.id == order_id).first()
+    return db.query(Order).populate_existing().filter(Order.id == order_id).first()
+
+
+class PriceChanged(ValueError):
+    def __init__(self, items: list[dict], subtotal_cents: int):
+        self.detail = {"code": "price_changed", "message": "Los precios cambiaron. Revisa el pedido antes de confirmar.", "items": items, "subtotal_cents": subtotal_cents}
 
 
 class IdempotencyConflict(ValueError):
@@ -25,6 +31,9 @@ class IdempotencyConflict(ValueError):
 def _request_hash(payload: OrderCreate) -> str:
     # Hash del contrato validado, independiente de valores actuales del catálogo.
     normalized = payload.model_dump(mode="json")
+    for item in normalized["items"]:
+        if item.get("expected_unit_price_cents") is None:
+            item.pop("expected_unit_price_cents", None)
     for field in ("customer_name", "customer_phone", "delivery_address"):
         normalized[field] = normalized[field].strip()
     encoded = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -57,9 +66,18 @@ def create_order(db: Session, payload: OrderCreate, idempotency_key: str | None 
 
     subtotal = 0
     order_items: list[OrderItem] = []
+    changed_prices = []
 
+    # La edición administrativa bloquea la misma fila padre; orden estable evita deadlocks.
+    products = {product.id: product for product in db.query(Product).filter(
+        Product.id.in_(sorted({item.product_id for item in payload.items}))
+    ).order_by(Product.id).with_for_update().all()}
+    if idempotency_key:
+        existing = _existing_order(db, idempotency_key, request_hash)
+        if existing is not None:
+            return existing
     for item in payload.items:
-        product = db.query(Product).filter(Product.id == item.product_id).first()
+        product = products.get(item.product_id)
         if product is None:
             raise ValueError(f"El producto {item.product_id} no existe.")
         if not product.is_active:
@@ -81,6 +99,8 @@ def create_order(db: Session, payload: OrderCreate, idempotency_key: str | None 
             raise ValueError(f"Selecciona una talla para {product.name}.")
 
         unit_price_cents = product.price_cents + (variant.price_adjustment_cents if variant else 0)
+        if item.expected_unit_price_cents is not None and item.expected_unit_price_cents != unit_price_cents:
+            changed_prices.append({"product_id": product.id, "variant_id": variant.id if variant else None, "expected_unit_price_cents": item.expected_unit_price_cents, "current_unit_price_cents": unit_price_cents})
         line_total = unit_price_cents * item.quantity
         subtotal += line_total
         if unit_price_cents < 0 or subtotal > 2_147_483_647:
@@ -101,6 +121,9 @@ def create_order(db: Session, payload: OrderCreate, idempotency_key: str | None 
                 total_price_cents=line_total,
             )
         )
+
+    if changed_prices:
+        raise PriceChanged(changed_prices, subtotal)
 
     order = Order(
         user_id=None,
@@ -151,7 +174,12 @@ def update_order_status(db: Session, order_id: int, new_status: str) -> Order:
     if new_status not in transitions[order.status]:
         raise ValueError(f"No se puede cambiar el pedido de {order.status} a {new_status}.")
 
-    order.status = new_status
+    # Solo una transición puede consumir el estado observado.
+    result = db.execute(update(Order).where(Order.id == order_id, Order.status == order.status)
+        .values(status=new_status).execution_options(synchronize_session=False))
+    if result.rowcount != 1:
+        db.rollback()
+        raise ValueError("El estado del pedido cambió. Actualiza los pedidos antes de continuar.")
     db.commit()
     db.refresh(order)
     return order

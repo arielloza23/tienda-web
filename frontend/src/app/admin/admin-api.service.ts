@@ -7,7 +7,7 @@ import { AdminAuth } from './auth.service';
 
 export interface ProductCreate {
   name: string; slug: string; description: string | null; price_cents: number; is_active: boolean; image_url: string | null;
-  variants: Array<{ sku: string; size: string | null; color: string | null; price_adjustment_cents: number }>;
+  variants: Array<{ sku: string; size: string | null; color: string | null; price_adjustment_cents: number; bust_cm?: number | null; waist_cm?: number | null; hip_cm?: number | null }>;
   images: Array<{ url: string; alt: string; color: string }>;
 }
 export interface ProductUpdate extends Omit<ProductCreate, 'variants'> {
