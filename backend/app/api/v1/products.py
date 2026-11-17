@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, HTTPException, Path, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin, require_authenticated_admin
@@ -36,7 +38,7 @@ def upload_image(file: UploadFile = File(...)) -> dict[str, str]:
 
 
 @router.get("/{product_id}", response_model=ProductRead)
-def read_product(product_id: int, db: Session = Depends(get_db)) -> ProductRead:
+def read_product(product_id: Annotated[int, Path(gt=0, le=2147483647)], db: Session = Depends(get_db)) -> ProductRead:
     product = get_product_by_id(db, product_id)
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado.")
@@ -59,7 +61,7 @@ def create_new_product(payload: ProductCreate, db: Session = Depends(get_db)) ->
 
 
 @router.put("/{product_id}", response_model=ProductRead, dependencies=[Depends(require_authenticated_admin)])
-def edit_product(product_id: int, payload: ProductUpdate, db: Session = Depends(get_db)) -> ProductRead:
+def edit_product(product_id: Annotated[int, Path(gt=0, le=2147483647)], payload: ProductUpdate, db: Session = Depends(get_db)) -> ProductRead:
     try:
         product = update_product(db, product_id, payload)
     except ProductConflict as exc:

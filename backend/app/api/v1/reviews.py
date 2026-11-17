@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -10,7 +12,7 @@ from app.services.review_service import get_own_review, list_reviews, require_ac
 router = APIRouter(prefix="/products/{product_id}/reviews", tags=["reviews"])
 
 
-def active_product(product_id: int, db: Session = Depends(get_db)) -> int:
+def active_product(product_id: Annotated[int, Path(gt=0, le=2147483647)], db: Session = Depends(get_db)) -> int:
     try:
         require_active_product(db, product_id)
     except LookupError as exc:
@@ -20,7 +22,7 @@ def active_product(product_id: int, db: Session = Depends(get_db)) -> int:
 
 @router.get("", response_model=ReviewPage)
 def read_reviews(product_id: int = Depends(active_product), limit: int = Query(10, ge=1, le=50),
-                 offset: int = Query(0, ge=0), db: Session = Depends(get_db)) -> ReviewPage:
+                 offset: int = Query(0, ge=0, le=2147483647), db: Session = Depends(get_db)) -> ReviewPage:
     return list_reviews(db, product_id, limit, offset)
 
 

@@ -272,3 +272,36 @@ def test_forgot_response_does_not_wait_for_smtp(db_session, configured_mail):
     assert db_session.query(PasswordResetToken).count() == 1
     asyncio.run(background())
     assert len(configured_mail) == 1
+
+@pytest.mark.parametrize('elapsed_seconds, accepted', [(0.5, True), (2, False)])
+def test_reset_rechecks_expiry_after_waiting_and_hashing(db_session, monkeypatch, elapsed_seconds, accepted):
+    user = add_user(db_session)
+    original_hash = user.password_hash
+    token = 'temporary-expiring-link'
+    initial = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    record = PasswordResetToken(user_id=user.id, token_hash=hashlib.sha256(token.encode()).hexdigest(),
+        created_at=initial - timedelta(minutes=29), expires_at=initial + timedelta(seconds=1))
+    db_session.add(record); db_session.commit()
+
+    class Clock:
+        value = initial
+        @classmethod
+        def now(cls, tz):
+            return cls.value
+
+    def slow_hash(password):
+        # Simulates elapsed time waiting for the account lock or deriving the hash.
+        Clock.value = initial + timedelta(seconds=elapsed_seconds)
+        return 'replacement-hash'
+
+    monkeypatch.setattr(recovery, 'datetime', Clock)
+    monkeypatch.setattr(recovery, 'hash_password', slow_hash)
+    if accepted:
+        recovery.reset_password(db_session, token, 'new-password-123')
+    else:
+        with pytest.raises(ValueError, match=recovery.INVALID_TOKEN):
+            recovery.reset_password(db_session, token, 'new-password-123')
+    db_session.expire_all()
+    assert user.password_hash == ('replacement-hash' if accepted else original_hash)
+    assert user.token_version == (1 if accepted else 0)
+    assert record.used_at == (Clock.value.replace(tzinfo=None) if accepted else None)

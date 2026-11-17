@@ -7,8 +7,8 @@ from app.models.order import OrderStatus
 
 
 class OrderItemCreate(BaseModel):
-    product_id: int = Field(..., gt=0)
-    variant_id: Optional[int] = Field(default=None, gt=0)
+    product_id: int = Field(..., gt=0, le=2147483647)
+    variant_id: Optional[int] = Field(default=None, gt=0, le=2147483647)
     quantity: int = Field(..., gt=0, le=100, strict=True)
     expected_unit_price_cents: int | None = Field(default=None, ge=0, le=2147483647, strict=True)
 

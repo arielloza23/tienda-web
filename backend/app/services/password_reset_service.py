@@ -107,6 +107,8 @@ def reset_password(db: Session, token: str, password: str) -> None:
     if user is None:
         raise ValueError(INVALID_TOKEN)
     password_hash = hash_password(password)
+    # The account lock and password hashing can outlive the remaining token lifetime.
+    now = datetime.now(timezone.utc)
     consumed = db.execute(update(PasswordResetToken).where(PasswordResetToken.id == record.id,
         PasswordResetToken.used_at.is_(None), PasswordResetToken.expires_at > now).values(used_at=now).execution_options(synchronize_session=False))
     if consumed.rowcount != 1:

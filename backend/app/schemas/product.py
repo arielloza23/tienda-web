@@ -21,7 +21,7 @@ class ProductVariantCreate(ProductVariantBase):
 
 
 class ProductVariantUpdate(ProductVariantCreate):
-    id: int | None = Field(default=None, strict=True, gt=0)
+    id: int | None = Field(default=None, strict=True, gt=0, le=2147483647)
 
 
 class ProductVariantRead(ProductVariantBase):

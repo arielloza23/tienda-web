@@ -1,6 +1,8 @@
+from typing import Annotated
+
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
@@ -18,7 +20,7 @@ def list_orders(db: Session = Depends(get_db)) -> list[OrderRead]:
 
 
 @router.get("/{order_id}", response_model=OrderRead, dependencies=[Depends(require_admin)])
-def read_order(order_id: int, db: Session = Depends(get_db)) -> OrderRead:
+def read_order(order_id: Annotated[int, Path(gt=0, le=2147483647)], db: Session = Depends(get_db)) -> OrderRead:
     order = get_order_by_id(db, order_id)
     if order is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado.")
@@ -46,7 +48,7 @@ def create_new_order(
     response_model=OrderRead,
     dependencies=[Depends(require_admin)],
 )
-def update_status(order_id: int, new_status: OrderStatus, db: Session = Depends(get_db)) -> OrderRead:
+def update_status(order_id: Annotated[int, Path(gt=0, le=2147483647)], new_status: OrderStatus, db: Session = Depends(get_db)) -> OrderRead:
     try:
         return update_order_status(db, order_id, new_status)
     except ValueError as exc:
