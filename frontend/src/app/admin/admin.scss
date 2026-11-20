@@ -55,7 +55,7 @@ button:disabled,fieldset:disabled .button { cursor:wait; opacity:.55; } .order-a
 .submit-button + .secondary { margin-top:12px; width:100%; }
 
 .workspace[hidden] { display:none; }
-.admin-sections { display:flex; gap:12px; margin-bottom:24px; }
+.admin-sections { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:24px; }
 .admin-sections [aria-pressed=true] { background:#244b3a; color:white; }
 .measurement-heading { margin-top:20px; }
 .measurement-fields { grid-template-columns:repeat(3,minmax(0,1fr)); }

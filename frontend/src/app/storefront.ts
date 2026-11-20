@@ -9,6 +9,7 @@ import { DeliveryMap } from './components/delivery-map/delivery-map';
 import { ProductShowcase } from './components/product-showcase/product-showcase';
 import { availableQuantity, CartItem, Product, ProductVariant } from './models/product.model';
 import { OrderCreateRequest } from './models/order.model';
+import { AnalyticsService, AnalyticsTarget } from './services/analytics.service';
 import { CartService } from './services/cart.service';
 import { OrderReceiptService, SavedReceipt } from './services/order-receipt.service';
 import { OrderService } from './services/order.service';
@@ -27,6 +28,7 @@ export class Storefront implements OnInit {
   protected readonly customerAuth = inject(CustomerAuth);
   private feedbackTimeout?: ReturnType<typeof setTimeout>;
   private readonly productService = inject(ProductService);
+  private readonly analytics = inject(AnalyticsService);
   private readonly orderService = inject(OrderService);
   private readonly cartService = inject(CartService);
   private readonly receiptService = inject(OrderReceiptService);
@@ -69,14 +71,31 @@ export class Storefront implements OnInit {
   });
 
   protected setMaximumPrice(value: number | null): void {
+    this.analytics.track('filter_apply', undefined, undefined, 'price');
     this.maximumPrice.set(typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null);
   }
 
   protected clearCatalogFilters(): void {
+    this.analytics.track('filter_apply', undefined, undefined, 'clear');
     this.activeColor.set('Todos');
     this.activeSize.set('Todas');
     this.maximumPrice.set(null);
     this.catalogSort.set('featured');
+  }
+
+  protected applyFilter(target: AnalyticsTarget, value: string): void {
+    if (target === 'color') this.activeColor.set(value);
+    if (target === 'size') this.activeSize.set(value);
+    if (target === 'sort') this.catalogSort.set(value);
+    this.analytics.track('filter_apply', undefined, undefined, target);
+  }
+
+  protected trackWhatsApp(): void {
+    const products = new Set(this.orderConfirmation()?.items.map(item => item.product_id) ?? []);
+    for (const id of products) if (Number.isSafeInteger(id) && id! > 0 && id! <= 2147483647) {
+      this.analytics.track('whatsapp_click', id);
+    }
+    this.analytics.flush();
   }
 
   private matchingPrices(product: Product): number[] {
@@ -176,6 +195,9 @@ export class Storefront implements OnInit {
   protected openCart(): void {
     this.cartDialog().nativeElement.showModal();
     this.cartOpen.set(true);
+    if (!this.orderConfirmation()) for (const productId of new Set(this.cart().map(item => item.product.id))) {
+      this.analytics.track('checkout_start', productId);
+    }
   }
 
   protected closeCart(): void {
@@ -197,6 +219,7 @@ export class Storefront implements OnInit {
       this.cartFeedback.set(this.cartNotice());
       return;
     }
+    this.analytics.track('add_to_cart', product.id, variant?.id);
     clearTimeout(this.feedbackTimeout);
     this.cartFeedback.set(`${product.name}${variant?.size ? ', talla ' + variant.size : ''} añadido. ${this.cartCount()} ${this.cartCount() === 1 ? 'unidad' : 'unidades'} en tu pedido.`);
     this.feedbackTimeout = setTimeout(() => this.cartFeedback.set(''), 3500);
@@ -205,7 +228,9 @@ export class Storefront implements OnInit {
   protected quantityLimit(item: CartItem): number { return availableQuantity(item.product, item.variant); }
 
   protected increaseQuantity(item: CartItem): void {
-    if (!this.isSubmittingOrder()) this.cartService.add(item.product, item.variant);
+    if (!this.isSubmittingOrder() && this.cartService.add(item.product, item.variant)) {
+      this.analytics.track('add_to_cart', item.product.id, item.variant?.id);
+    }
   }
 
   protected decreaseQuantity(item: CartItem): void {

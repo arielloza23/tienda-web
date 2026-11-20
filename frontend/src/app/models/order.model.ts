@@ -1,4 +1,5 @@
 export interface OrderCreateRequest {
+  analytics_session_id?: string;
   customer_name: string;
   customer_phone: string;
   delivery_address: string;
@@ -24,6 +25,7 @@ export interface OrderReceipt {
   subtotal_cents: number;
   total_cents: number;
   items: Array<{
+    product_id?: number;
     product_name: string;
     variant_label: string | null;
     quantity: number;

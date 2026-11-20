@@ -1,0 +1,48 @@
+<section class="dashboard" aria-labelledby="dashboard-title" [attr.aria-busy]="loading()">
+  <header class="heading"><div><p class="eyebrow">Conoce tu tienda</p><h2 id="dashboard-title">Indicadores</h2><p>Clientes, opiniones y el recorrido hasta la compra.</p></div>
+    <button type="button" (click)="load()" [disabled]="loading()">Actualizar</button>
+  </header>
+  <nav class="periods" aria-label="Período de indicadores">
+    @for (period of periods; track period) { <button type="button" [attr.aria-pressed]="days() === period" (click)="selectPeriod(period)" [disabled]="loading()">{{ period }} días</button> }
+  </nav>
+  @if (loading()) { <p class="notice" role="status">Cargando indicadores…</p> }
+  @if (error()) { <div class="notice error" role="alert"><p>{{ error() }}</p><button type="button" (click)="load()">Reintentar</button></div> }
+  @if (data(); as d) {
+    <p class="muted period-note">Del {{ d.period_start | date:'dd/MM/yyyy':'-0500' }} al {{ d.period_end | date:'dd/MM/yyyy HH:mm':'-0500' }} · Hora de Ecuador. Actualizado {{ d.generated_at | date:'HH:mm':'-0500' }}.</p>
+    <div class="summary">
+      <article class="card"><p>Clientes registrados</p><strong>{{ d.users.customers | number }}</strong><small>Total acumulado · Cuentas habilitadas: {{ d.users.active_customers }}; deshabilitadas: {{ d.users.inactive_customers }}. {{ d.users.administrators }} administradores aparte.</small></article>
+      <article class="card"><p>Pedidos creados</p><strong>{{ d.orders.total | number }}</strong><small>En el período seleccionado, incluidos los cancelados.</small></article>
+      <article class="card"><p>Pagados o avanzados</p><strong>{{ d.orders.paid | number }}</strong><small>Actualmente pagados, enviados o entregados; de los pedidos del período.</small></article>
+      <article class="card"><p>Reservados</p><strong>{{ d.orders.reserved | number }}</strong><small>Actualmente reservados · {{ d.orders.cancelled }} cancelados.</small></article>
+    </div>
+    <aside class="notice">
+      @if (d.measurement_started_at) { <p>Medición de navegación disponible desde {{ d.measurement_started_at | date:'dd/MM/yyyy HH:mm':'-0500' }}.</p> }
+      @else { <p>Aún no hay interacciones registradas. Los datos empezarán a aparecer cuando se navegue por la tienda.</p> }
+      <p>Las sesiones representan visitas, no personas únicas. Los datos son orientativos y pueden ser parciales si el navegador bloquea la medición.</p>
+    </aside>
+    <section class="panel" aria-labelledby="interactions-title"><h3 id="interactions-title">Qué hacen al navegar</h3><p class="muted">Interacciones del período. Una sesión puede realizar la misma acción varias veces.</p>
+      <div class="interactions">
+        @for (item of d.interactions; track item.event_type) {
+          <div class="interaction"><div class="bar-heading"><span>{{ labels[item.event_type] || item.event_type }}</span><strong>{{ item.events | number }}</strong></div>
+            <div class="track" aria-hidden="true"><div class="fill" [style.width.%]="100 * item.events / maxEvents()"></div></div><small>{{ item.sessions | number }} sesiones</small>
+          </div>
+        } @empty { <p class="muted">Sin interacciones en este período.</p> }
+      </div>
+    </section>
+    <div class="rankings">
+      <section class="panel" aria-labelledby="comments-title"><h3 id="comments-title">Más comentarios</h3><p class="muted">Opiniones vigentes de todos los tiempos. Solo cuentan comentarios con texto.</p>
+        <ol class="ranking">@for (product of d.most_commented; track product.product_id) { <li><strong>{{ product.product_name }}</strong><span>{{ product.comments }} comentarios · {{ product.ratings }} opiniones</span></li> } @empty { <li class="muted">Aún no hay comentarios escritos.</li> }</ol>
+      </section>
+      <section class="panel" aria-labelledby="ratings-title"><h3 id="ratings-title">Mejor puntuación</h3><p class="muted">Promedio vigente de todos los tiempos. Compara también el número de opiniones.</p>
+        <ol class="ranking">@for (product of d.top_rated; track product.product_id) { <li><strong>{{ product.product_name }}</strong><span>{{ product.average_rating | number:'1.1-2' }} / 5 · {{ product.ratings }} opiniones</span>@if (product.ratings < 5) { <small class="sample">Muestra pequeña</small> }</li> } @empty { <li class="muted">Aún no hay puntuaciones.</li> }</ol>
+      </section>
+    </div>
+    <section class="panel" aria-labelledby="conversion-title"><h3 id="conversion-title">Conversión por producto</h3><p class="muted">Sesiones con una vista del producto en el período y acciones posteriores a esa vista. Cada sesión cuenta una vez por producto y etapa.</p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Tabla de conversión por producto"><table><caption>Embudo de sesiones y tasas por producto</caption><thead><tr><th scope="col">Producto</th><th scope="col">Vistas</th><th scope="col">Carrito</th><th scope="col">Inicio pedido</th><th scope="col">Con pedido</th><th scope="col">Con pago</th><th scope="col">A pedido</th><th scope="col">A pago</th></tr></thead><tbody>
+        @for (product of d.products; track product.product_id) { <tr><th scope="row">{{ product.product_name }}</th><td>{{ product.view_sessions | number }}</td><td>{{ product.cart_sessions | number }}</td><td>{{ product.checkout_sessions | number }}</td><td>{{ product.order_sessions | number }}</td><td>{{ product.paid_sessions | number }}</td><td>@if (product.order_conversion !== null) { {{ product.order_conversion | number:'1.0-2' }} % } @else { <span class="muted">Sin datos</span> }</td><td>@if (product.payment_conversion !== null) { {{ product.payment_conversion | number:'1.0-2' }} % } @else { <span class="muted">Sin datos</span> }</td></tr> } @empty { <tr><td colspan="8">Aún no hay productos para comparar.</td></tr> }
+      </tbody></table></div>
+      <div class="definitions"><p><strong>A pedido:</strong> sesiones con pedido registrado del producto / sesiones con vista. <strong>A pago:</strong> sesiones con pedido actualmente pagado, enviado o entregado / sesiones con vista.</p>
+      <p>El pago refleja el estado actual de los pedidos creados en el período, no la fecha en que se pagaron. Cancelar un pedido puede cambiar la tasa. Reservar o abrir WhatsApp no cuenta como pago.</p><p>{{ d.orders.unattributed }} pedidos del período sin identificador de sesión quedan fuera de las tasas. También se excluyen pedidos sin una vista previa del producto dentro del período. Las visitas anteriores al inicio de medición no se pueden reconstruir.</p></div>
+    </section>
+  }
+</section>

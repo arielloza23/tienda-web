@@ -347,3 +347,53 @@ el producto a variantes. Se conserva el historial de variantes referenciadas.
 Validar migraciones solo en bases temporales. El downgrade retira los campos
 y sus cantidades, y se rechaza si existen reservas o pedidos que descontaron
 stock. No usarlo como forma de deshacer ventas ni como prueba en datos reales.
+
+
+## Dashboard privado y analitica comercial
+
+La migracion `20261120_analytics` agrega `analytics_events` y una atribucion
+opcional `orders.analytics_session_id`; no inventa visitas ni atribuciones
+historicas. No cambia precios, cantidades, estados ni inventario. El UUID de
+analitica queda siempre fuera del hash de idempotencia: un reintento conserva
+la atribucion del pedido original y nunca modifica su cuenta de cliente.
+
+- `POST /api/v1/analytics/events`: publico, cuerpo `{ "events": [...] }`, entre
+  1 y 20 eventos y hasta 16 KiB. Cada evento contiene UUID `event_id`, UUID
+  `session_id`, `event_type` y, salvo filtros, `product_id`. Admite `variant_id`
+  solo si pertenece al producto. `variant_select` exige variante. Los tipos son
+  `product_view`, `variant_select`, `gallery_open`, `reviews_open`, `add_to_cart`,
+  `checkout_start`, `whatsapp_click` y `filter_apply`. Este ultimo no admite
+  producto/variante y exige `target`: `size`, `color`, `price`, `sort` o `clear`.
+  No admite texto libre, URL, correo, token, timestamps del cliente ni mas campos.
+  Devuelve 202 `{ "accepted": 1, "duplicates": 0 }`. Un UUID repetido con igual
+  contenido no suma otra interaccion; otro contenido devuelve 409 y revierte el lote.
+- `GET /api/v1/analytics/dashboard?days=7|30|90`: exige administrador autenticado,
+  incluso con bypass de desarrollo, y envia `Cache-Control: no-store`.
+  Conteos de clientes/administradores y rankings de opiniones son globales actuales.
+  Los rankings distinguen comentarios no vacios de votos y muestran el numero
+  de valoraciones junto a la media, sin simular precision estadistica.
+
+La ventana incluye hoy y empieza a medianoche de Ecuador (UTC-5). Los totales
+comerciales agrupan pedidos por fecha de creacion y muestran su estado actual;
+`paid` incluye pagados, enviados y entregados. No representa fecha de cobro.
+La conversion por producto usa sesiones distintas cuya primera vista registrada
+**dentro de la ventana** pertenece al periodo. Carrito, checkout y pedidos deben
+ser posteriores a esa vista y estar tambien dentro de la ventana. Lineas repetidas,
+unidades y varios pedidos de la misma sesion no multiplican conversiones.
+`order_conversion` es sesiones con pedido / sesiones con vista * 100;
+`payment_conversion` usa pedidos actualmente pagados/enviados/entregados.
+Sin vistas el porcentaje es `null`, no cero. Pedidos cancelados conservan el hito
+de creacion, pero no cuentan como pagados. Pedidos antiguos sin atribucion no
+entran en esos porcentajes. No se deduce compra de un clic a WhatsApp.
+
+El servidor fija la hora y valida referencias. Se limita la ingestion a 120
+peticiones/minuto por direccion de red y 240 eventos/minuto por sesion. El limite
+es por proceso, con claves de red hash efimeras y sin guardar IP/user-agent;
+varios procesos requieren un limite compartido en el proxy. La analitica publica
+es orientativa: un cliente puede bloquearla o enviar interacciones sinteticas;
+los pedidos y estados proceden de la base del comercio. No es una auditoria
+antifraude. No se historizan fechas de registro ni transiciones de pago antiguas.
+La tabla no contiene datos personales ni contacto; los identificadores de sesion
+son seudonimos temporales. No hay borrado automatico de eventos en esta entrega.
+Upgrade, downgrade y reupgrade se validan solo en bases temporales; downgrade
+elimina eventos y atribuciones, conservando pedidos, productos y usuarios.

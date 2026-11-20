@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -31,6 +32,7 @@ class OrderItemRead(BaseModel):
 class OrderCreate(BaseModel):
     # El checkout público no acepta atribuciones a cuentas del cliente.
     user_id: None = None
+    analytics_session_id: UUID | None = None
     customer_name: str = Field(..., min_length=2, max_length=200)
     customer_phone: str = Field(..., min_length=7, max_length=30)
     delivery_address: str = Field(..., min_length=8, max_length=500)

@@ -31,12 +31,12 @@
       <div class="catalog-toolbar">
         <div class="color-filters" role="group" aria-label="Filtrar por color">
           @for (color of availableColors(); track color) {
-            <button type="button" [class.active]="activeColor() === color" [attr.aria-pressed]="activeColor() === color" (click)="activeColor.set(color)">{{ color }}</button>
+            <button type="button" [class.active]="activeColor() === color" [attr.aria-pressed]="activeColor() === color" (click)="applyFilter('color', color)">{{ color }}</button>
           }
         </div>
         <div class="catalog-controls">
           <label for="catalog-size">Talla
-            <select id="catalog-size" [ngModel]="activeSize()" (ngModelChange)="activeSize.set($event)">
+            <select id="catalog-size" [ngModel]="activeSize()" (ngModelChange)="applyFilter('size', $event)">
               @for (size of availableSizes(); track size) { <option [value]="size">{{ size }}</option> }
             </select>
           </label>
@@ -45,7 +45,7 @@
               [ngModel]="maximumPrice()" (ngModelChange)="setMaximumPrice($event)" />
           </label>
           <label for="catalog-sort">Ordenar por
-            <select id="catalog-sort" [ngModel]="catalogSort()" (ngModelChange)="catalogSort.set($event)">
+            <select id="catalog-sort" [ngModel]="catalogSort()" (ngModelChange)="applyFilter('sort', $event)">
               <option value="featured">Orden de la colección</option>
               <option value="price-asc">Precio: menor a mayor</option>
               <option value="price-desc">Precio: mayor a menor</option>
@@ -110,7 +110,7 @@
                 Tu pedido ya está registrado. Toca el botón para continuar en WhatsApp y coordinar el envío y el pago.
               </p>
               @if (whatsappFollowupUrl(); as whatsappUrl) {
-                <a class="whatsapp-confirmation-link" [href]="whatsappUrl">
+                <a class="whatsapp-confirmation-link" [href]="whatsappUrl" (click)="trackWhatsApp()">
                   Continuar en WhatsApp <span aria-hidden="true">↗</span>
                 </a>
               }

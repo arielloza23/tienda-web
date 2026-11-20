@@ -4,7 +4,9 @@ import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Storefront } from './storefront';
+import { AnalyticsService } from './services/analytics.service';
 import { CartService } from './services/cart.service';
 import { OrderService } from './services/order.service';
 import { ProductService } from './services/product.service';
@@ -57,5 +59,60 @@ describe('Checkout availability conflict', () => {
     expect(app.customerName()).toBe('Cliente'); expect(app.deliveryAddress()).toBe('Dirección guardada');
     expect(app.checkoutError()).toContain('suficientes'); expect(cart.notice()).toContain('Ajustamos');
     expect(orders.createOrder).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('Store interaction measurement', () => {
+  it('counts only successful cart additions and distinct products when opening checkout', () => {
+    localStorage.clear(); sessionStorage.clear();
+    const analytics = { track: vi.fn(), flush: vi.fn(), setFeaturedProduct: vi.fn() };
+    TestBed.configureTestingModule({ providers: [provideRouter([]), provideHttpClient(),
+      { provide: AnalyticsService, useValue: analytics }] });
+    const app = TestBed.createComponent(Storefront).componentInstance as any;
+    const cart = TestBed.inject(CartService);
+    const variantProduct = { ...product, stock_quantity: 2, variants: [
+      { id: 10, sku: 'M', size: 'M', price_adjustment_cents: 0, stock_quantity: 1 },
+      { id: 11, sku: 'S', size: 'S', price_adjustment_cents: 0, stock_quantity: 1 },
+    ] };
+    cart.reconcile([variantProduct]);
+    app.addToCart(variantProduct, variantProduct.variants[0]);
+    app.addToCart(variantProduct, variantProduct.variants[0]);
+    app.addToCart(variantProduct, variantProduct.variants[1]);
+    expect(analytics.track.mock.calls.filter(call => call[0] === 'add_to_cart')).toHaveLength(2);
+    // The UI opens a native dialog; the measurement itself must not duplicate product lines.
+    app.cartDialog = () => ({ nativeElement: { showModal: vi.fn() } });
+    app.openCart();
+    expect(analytics.track.mock.calls.filter(call => call[0] === 'checkout_start')).toEqual([['checkout_start', 1]]);
+    app.orderConfirmation.set({ items: [{ product_id: 1 }, { product_id: 1 }, { product_id: 2 }] });
+    app.trackWhatsApp();
+    expect(analytics.track.mock.calls.filter(call => call[0] === 'whatsapp_click')).toEqual([['whatsapp_click', 1], ['whatsapp_click', 2]]);
+    expect(analytics.flush).toHaveBeenCalledOnce();
+  });
+});
+
+
+describe('WhatsApp measurement payload contract', () => {
+  it('emits a valid product event per distinct confirmed receipt product, never contact information', () => {
+    sessionStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()] });
+    const app = TestBed.createComponent(Storefront).componentInstance as any;
+    const receipts = TestBed.inject(OrderReceiptService);
+    const item = { product_name: 'Body', variant_label: null, quantity: 1, total_price_cents: 1000 };
+    receipts.save({ id: 9, status: 'pending', customer_name: 'Private name', customer_phone: '0991234567',
+      delivery_address: 'Private address', delivery_latitude: -1, delivery_longitude: -79,
+      subtotal_cents: 3000, total_cents: 3000,
+      items: [{ ...item, product_id: 1 }, { ...item, product_id: 1 }, { ...item, product_id: 2 }] });
+    app.orderConfirmation.set(receipts.latest());
+    app.trackWhatsApp();
+    const http = TestBed.inject(HttpTestingController);
+    const request = http.expectOne(req => req.url.endsWith('/analytics/events'));
+    const events = request.request.body.events;
+    expect(events.map((event: any) => [event.event_type, event.product_id])).toEqual([
+      ['whatsapp_click', 1], ['whatsapp_click', 2],
+    ]);
+    expect(JSON.stringify(request.request.body)).not.toMatch(/Private|0991234567|customer_|address|product_name/);
+    request.flush({ accepted: 2 });
+    http.verify();
   });
 });

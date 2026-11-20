@@ -13,6 +13,14 @@ describe('Order receipt privacy and expiry', () => {
     expect(new OrderReceiptService().latest()).toEqual({ id: 42, status: 'pending', subtotal_cents: 1500, total_cents: 1500, items: order.items });
     service.forget(); expect(new OrderReceiptService().latest()).toBeNull();
   });
+  it('preserves valid product identifiers for WhatsApp measurement without attributing legacy receipts', () => {
+    const service = new OrderReceiptService();
+    service.save({ ...order, items: [{ ...order.items[0], product_id: 7 }] });
+    expect(new OrderReceiptService().latest()?.items[0].product_id).toBe(7);
+    service.save(order);
+    expect(new OrderReceiptService().latest()?.items[0].product_id).toBeUndefined();
+  });
+
   it('rejects expired and malformed saved receipts', () => {
     vi.useFakeTimers();
     new OrderReceiptService().save(order);

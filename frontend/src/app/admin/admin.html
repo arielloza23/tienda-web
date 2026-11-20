@@ -22,7 +22,9 @@
     <nav class="admin-sections" aria-label="Secciones de administración">
       <button type="button" class="button secondary" [attr.aria-pressed]="section() === 'products'" (click)="section.set('products'); loadProducts()">Productos</button>
       <button type="button" class="button secondary" [attr.aria-pressed]="section() === 'orders'" (click)="section.set('orders')">Pedidos</button>
+      <button type="button" class="button secondary" [attr.aria-pressed]="section() === 'dashboard'" (click)="section.set('dashboard')">Indicadores</button>
     </nav>
+    @if (section() === 'dashboard') { <app-admin-dashboard /> }
     @if (section() === 'orders') { <app-admin-orders /> }
     <div class="workspace" [hidden]="section() !== 'products'">
       <section class="panel" aria-labelledby="create-title">

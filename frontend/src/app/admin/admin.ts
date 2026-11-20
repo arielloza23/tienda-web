@@ -9,15 +9,16 @@ import { finalize } from 'rxjs';
 import { Product } from '../models/product.model';
 import { AdminAuth } from './auth.service';
 import { AdminOrders } from './orders';
+import { AdminDashboard } from './dashboard';
 import { AdminApi } from './admin-api.service';
 import { emptyProductDraft, productRequest, productToDraft, productUpdateRequest, stockQuantity } from './product-form';
 
-@Component({ imports: [CommonModule, FormsModule, RouterLink, AdminOrders], templateUrl: './admin.html', styleUrl: './admin.scss' })
+@Component({ imports: [CommonModule, FormsModule, RouterLink, AdminOrders, AdminDashboard], templateUrl: './admin.html', styleUrl: './admin.scss' })
 export class Admin implements OnInit {
   protected readonly auth = inject(AdminAuth);
   private readonly api = inject(AdminApi);
   private readonly destroyRef = inject(DestroyRef);
-  protected readonly section = signal<'products' | 'orders'>('products');
+  protected readonly section = signal<'products' | 'orders' | 'dashboard'>('products');
   protected readonly measurementFields = [{ key: 'bust_cm', label: 'Busto' }, { key: 'waist_cm', label: 'Cintura' }, { key: 'hip_cm', label: 'Cadera' }] as const;
   protected loginEmail = '';
   protected loginPassword = '';

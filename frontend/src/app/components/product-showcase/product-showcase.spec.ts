@@ -1,6 +1,7 @@
 import { Component, input } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AnalyticsService } from '../../services/analytics.service';
 import { Product } from '../../models/product.model';
 import { ProductReviews } from '../product-reviews/product-reviews';
 import { ProductShowcase } from './product-showcase';
@@ -29,7 +30,7 @@ describe('Product showcase covers and photo gallery', () => {
   const dialog = () => host.querySelector<HTMLDialogElement>('.photo-dialog')!;
   const click = (selector: string) => { host.querySelector<HTMLButtonElement>(selector)!.click(); fixture.detectChanges(); };
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [ProductShowcase] });
+    TestBed.configureTestingModule({ imports: [ProductShowcase], providers: [{ provide: AnalyticsService, useValue: { track: vi.fn(), setFeaturedProduct: vi.fn() } }] });
     TestBed.overrideComponent(ProductShowcase, { remove: { imports: [ProductReviews] }, add: { imports: [ReviewsStub] } });
     vi.stubGlobal('matchMedia', () => ({ matches: true }));
     HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -46,6 +47,22 @@ describe('Product showcase covers and photo gallery', () => {
   });
 
   afterEach(() => { fixture.destroy(); vi.unstubAllGlobals(); });
+
+  it('measures only the featured product and explicit interactions, without duplicate views on variant updates', () => {
+    const track = TestBed.inject(AnalyticsService).track;
+    expect(track).toHaveBeenCalledExactlyOnceWith('product_view', 1);
+    click('.showcase-sizes button:nth-of-type(2)');
+    expect(track).toHaveBeenCalledWith('variant_select', 1, 11);
+    click('.photo-open');
+    expect(track).toHaveBeenCalledWith('gallery_open', 1);
+    click('.photo-dialog-close');
+    click('.showcase-reviews');
+    expect(track).toHaveBeenCalledWith('reviews_open', 1);
+    click('.reviews-dialog-close');
+    expect(vi.mocked(track).mock.calls.filter(call => call[0] === 'product_view')).toHaveLength(1);
+    click('.stage-arrow-next');
+    expect(track).toHaveBeenCalledWith('product_view', 2);
+  });
 
   it('loads reviews only in the popup, using the selected product and a stable snapshot', () => {
     expect(host.querySelector('app-product-reviews')).toBeNull();

@@ -42,8 +42,9 @@ def test_price_changed_rejects_without_order_then_confirms_and_replays(client, d
 
 def test_hash_keeps_legacy_optional_null_fields():
     payload = OrderCreate(**order_payload(1))
-    legacy = payload.model_dump(mode="json")
-    legacy["items"][0].pop("expected_unit_price_cents")
+    # Contrato anterior explicito: no inferir campos historicos desde el modelo nuevo.
+    legacy = dict(order_payload(1), user_id=None, delivery_latitude=None, delivery_longitude=None)
+    legacy["items"][0]["variant_id"] = None
     encoded = json.dumps(legacy, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     assert order_service._request_hash(payload) == hashlib.sha256(encoded.encode()).hexdigest()
 

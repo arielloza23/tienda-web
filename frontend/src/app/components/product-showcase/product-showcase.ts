@@ -1,5 +1,6 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, computed, effect, ElementRef, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, computed, DestroyRef, effect, ElementRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { AnalyticsService } from '../../services/analytics.service';
 import { ProductOptions } from '../product-options/product-options';
 import { ProductReviews } from '../product-reviews/product-reviews';
 import { availableQuantity, Product, ProductVariant } from '../../models/product.model';
@@ -11,6 +12,8 @@ import { availableQuantity, Product, ProductVariant } from '../../models/product
   styleUrl: './product-showcase.scss',
 })
 export class ProductShowcase {
+  private readonly analytics = inject(AnalyticsService);
+  private lastViewedProduct?: number;
   readonly products = input.required<Product[]>();
   readonly selectedProductId = model<number | null>(null);
   readonly addProduct = output<{ product: Product; variant: ProductVariant | null }>();
@@ -51,14 +54,20 @@ export class ProductShowcase {
   private suppressClickUntil = 0;
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => this.analytics.setFeaturedProduct(undefined));
     effect(() => {
       this.selectedProductId();
       this.products();
       this.variantId.set(null);
     });
     effect(() => {
-      this.product()?.id;
+      const productId = this.product()?.id;
       this.photoIndex.set(0);
+      if (productId && productId !== this.lastViewedProduct) {
+        this.analytics.track('product_view', productId);
+      }
+      if (!productId) this.analytics.setFeaturedProduct(undefined);
+      this.lastViewedProduct = productId;
     });
   }
 
@@ -73,6 +82,7 @@ export class ProductShowcase {
     this.reviewsTrigger = event.currentTarget as HTMLElement;
     this.reviewsProduct.set({ id: product.id, name: product.name });
     this.reviewsDialog().nativeElement.showModal();
+    this.analytics.track('reviews_open', product.id);
   }
 
   protected closeReviews(): void {
@@ -102,7 +112,10 @@ export class ProductShowcase {
   protected openPhoto(): void {
     if (performance.now() < this.suppressClickUntil) return;
     this.photoIndex.set(0);
-    if (this.cover()) this.photoDialog().nativeElement.showModal();
+    if (this.cover()) {
+      this.photoDialog().nativeElement.showModal();
+      this.analytics.track('gallery_open', this.product()?.id);
+    }
   }
 
   protected onDialogClick(event: MouseEvent): void {
@@ -127,6 +140,12 @@ export class ProductShowcase {
     this.direction.set(index > this.index() ? 'next' : 'previous');
     this.selectedProductId.set(this.products()[index].id);
     this.variantId.set(null);
+  }
+
+  protected selectVariant(id: number): void {
+    this.variantId.set(id);
+    const product = this.product();
+    if (product?.variants.some(variant => variant.id === id)) this.analytics.track('variant_select', product.id, id);
   }
 
   protected addToOrder(): void {

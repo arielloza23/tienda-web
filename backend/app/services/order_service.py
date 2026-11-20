@@ -67,6 +67,7 @@ class IdempotencyConflict(ValueError):
 def _request_hash(payload: OrderCreate) -> str:
     # Hash del contrato validado, independiente de valores actuales del catálogo.
     normalized = payload.model_dump(mode="json")
+    normalized.pop("analytics_session_id", None)
     for item in normalized["items"]:
         if item.get("expected_unit_price_cents") is None:
             item.pop("expected_unit_price_cents", None)
@@ -165,6 +166,7 @@ def create_order(db: Session, payload: OrderCreate, idempotency_key: str | None 
 
     order = Order(
         user_id=None,
+        analytics_session_id=str(payload.analytics_session_id) if payload.analytics_session_id else None,
         idempotency_key=idempotency_key,
         request_hash=request_hash,
         customer_name=customer_name,

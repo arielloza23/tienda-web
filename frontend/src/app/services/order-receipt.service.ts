@@ -23,7 +23,9 @@ export class OrderReceiptService {
   }
   private sanitize(order: SavedReceipt): SavedReceipt {
     return { id: order.id, status: order.status, subtotal_cents: order.subtotal_cents, total_cents: order.total_cents,
-      items: order.items.map(item => ({ product_name: item.product_name, variant_label: item.variant_label,
+      items: order.items.map(item => ({
+        ...(Number.isSafeInteger(item.product_id) && item.product_id! > 0 && item.product_id! <= 2147483647 ? { product_id: item.product_id } : {}),
+        product_name: item.product_name, variant_label: item.variant_label,
         quantity: item.quantity, total_price_cents: item.total_price_cents })) };
   }
   private read(): SavedReceipt | null {

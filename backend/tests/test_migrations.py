@@ -235,3 +235,18 @@ def test_inventory_migration_downgrade_refuses_losing_reservations(alembic_db):
     with engine.connect() as c:
         assert c.execute(text('SELECT status,inventory_deducted FROM orders WHERE id=988')).one() == ('reserved',True)
         assert c.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '20261120_inventory'
+
+def test_analytics_migration_preserves_orders_and_reversible_schema(alembic_db):
+    config, engine = alembic_db
+    command.upgrade(config, "20261120_inventory")
+    with engine.begin() as c:
+        c.execute(text("INSERT INTO orders (id,status,subtotal_cents,total_cents,shipping_total_cents,tax_total_cents,created_at) VALUES (989,'pending',1500,1500,0,0,CURRENT_TIMESTAMP)"))
+    command.upgrade(config, "head")
+    with engine.connect() as c:
+        assert c.execute(text("SELECT total_cents,analytics_session_id FROM orders WHERE id=989")).one()==(1500,None)
+        assert c.execute(text("SELECT COUNT(*) FROM analytics_events")).scalar_one()==0
+    command.downgrade(config,"20261120_inventory")
+    with engine.connect() as c:
+        assert c.execute(text("SELECT total_cents FROM orders WHERE id=989")).scalar_one()==1500
+    command.upgrade(config,"head")
+    assert _schema_diff(engine)==[]

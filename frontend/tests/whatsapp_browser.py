@@ -4,6 +4,9 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from io import BytesIO
 from urllib.parse import urlparse, parse_qs
+import sys
+sys.path.insert(0,str(Path.cwd()/"backend"))
+from app.schemas.analytics import AnalyticsBatch
 import threading
 import time
 from PIL import Image
@@ -13,9 +16,9 @@ class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, *args): pass
 
 product = {"id": 1, "name": "Body de prueba", "slug": "body-test", "is_active": True,
-           "price_cents": 1500, "variants": [], "images": [], "image_url": "https://images.test/cover.png"}
+           "price_cents": 1500, "stock_quantity": 1, "variants": [], "images": [], "image_url": "https://images.test/cover.png"}
 receipt = {"id": 77, "status": "pending", "subtotal_cents": 1500, "total_cents": 1500,
-           "items": [{"product_name": product["name"], "variant_label": None, "quantity": 1, "total_price_cents": 1500}]}
+           "items": [{"product_id": 1, "product_name": product["name"], "variant_label": None, "quantity": 1, "total_price_cents": 1500}]}
 image = BytesIO(); Image.new("RGB", (40, 60), "teal").save(image, "PNG")
 server = ThreadingHTTPServer(("127.0.0.1", 8124), partial(QuietHandler, directory=str(Path.cwd() / "frontend/dist/frontend/browser")))
 thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
@@ -28,7 +31,15 @@ try:
                 context = browser.new_context(viewport={"width": width, "height": 844}, has_touch=True)
                 page = context.new_page()
                 errors = []; page.on("pageerror", lambda error: errors.append(str(error)))
-                posts = []; navigations = []
+                posts = []; navigations = []; analytics = []
+                def collect(route):
+                    if width == 1440:
+                        route.abort()  # Measurement unavailable must not block checkout/handoff.
+                        return
+                    batch = AnalyticsBatch.model_validate(route.request.post_data_json)
+                    analytics.extend(e.model_dump(mode='json') for e in batch.events)
+                    route.fulfill(status=202,json={"accepted":len(batch.events),"duplicates":0})
+                page.route("**/api/v1/analytics/events", collect)
                 # Any programmatic popup must never be needed to register or share the order.
                 page.add_init_script("window.open = () => { throw new Error('Popup blocked'); }")
                 page.route("**/api/v1/products", lambda route: route.fulfill(json=[product]))
@@ -72,6 +83,9 @@ try:
                 link.click()
                 expect(page).to_have_url(url)
                 assert navigations == [url] and len(posts) == 1
+                if width == 390:
+                    page.wait_for_timeout(500)
+                    assert any(e['event_type']=='whatsapp_click' and e['product_id']==1 for e in analytics),analytics
                 # Going back preserves the receipt without creating another order.
                 page.go_back()
                 page.get_by_role("button", name="\u00daltimo pedido", exact=True).click()
