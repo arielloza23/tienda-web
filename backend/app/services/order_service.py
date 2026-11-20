@@ -24,6 +24,42 @@ class PriceChanged(ValueError):
         self.detail = {"code": "price_changed", "message": "Los precios cambiaron. Revisa el pedido antes de confirmar.", "items": items, "subtotal_cents": subtotal_cents}
 
 
+class InventoryConflict(ValueError):
+    def __init__(self, code: str, message: str, items: list[dict] | None = None):
+        self.detail = {"code": code, "message": message}
+        if items is not None:
+            self.detail["items"] = items
+        super().__init__(message)
+
+
+def _inventory_lines(items):
+    quantities = {}
+    for item in items:
+        key = (item.product_id, item.variant_id)
+        quantities[key] = quantities.get(key, 0) + item.quantity
+    return quantities
+
+
+def _stock_target(db, product, variant_id):
+    if product is None:
+        return None
+    if variant_id is None:
+        return None if product.variants else product
+    return db.query(ProductVariant).populate_existing().filter(
+        ProductVariant.id == variant_id, ProductVariant.product_id == product.id).first()
+
+
+def _check_available(db, products, quantities):
+    missing = []
+    for (pid, vid), quantity in quantities.items():
+        target = _stock_target(db, products.get(pid), vid)
+        available = target.stock_quantity if target is not None else 0
+        if available < quantity:
+            missing.append({"product_id": pid, "variant_id": vid, "quantity": quantity, "available_quantity": available})
+    if missing:
+        raise InventoryConflict("insufficient_stock", "No hay suficientes unidades. Revisa las tallas y cantidades.", missing)
+
+
 class IdempotencyConflict(ValueError):
     pass
 
@@ -125,6 +161,8 @@ def create_order(db: Session, payload: OrderCreate, idempotency_key: str | None 
     if changed_prices:
         raise PriceChanged(changed_prices, subtotal)
 
+    _check_available(db, products, _inventory_lines(order_items))
+
     order = Order(
         user_id=None,
         idempotency_key=idempotency_key,
@@ -160,26 +198,51 @@ def create_order(db: Session, payload: OrderCreate, idempotency_key: str | None 
 
 
 def update_order_status(db: Session, order_id: int, new_status: str) -> Order:
-    order = get_order_by_id(db, order_id)
-    if order is None:
-        raise ValueError("El pedido indicado no existe.")
-
-    transitions = {
-        OrderStatus.PENDING.value: {OrderStatus.PAID.value, OrderStatus.CANCELLED.value},
-        OrderStatus.PAID.value: {OrderStatus.SHIPPED.value, OrderStatus.CANCELLED.value},
-        OrderStatus.SHIPPED.value: {OrderStatus.DELIVERED.value},
-        OrderStatus.DELIVERED.value: set(),
-        OrderStatus.CANCELLED.value: set(),
-    }
-    if new_status not in transitions[order.status]:
-        raise ValueError(f"No se puede cambiar el pedido de {order.status} a {new_status}.")
-
-    # Solo una transición puede consumir el estado observado.
-    result = db.execute(update(Order).where(Order.id == order_id, Order.status == order.status)
-        .values(status=new_status).execution_options(synchronize_session=False))
-    if result.rowcount != 1:
+    try:
+        # Mantener este hook permite sincronizar pruebas de dos administradores.
+        order = get_order_by_id(db, order_id)
+        if order is None:
+            raise ValueError("El pedido indicado no existe.")
+        transitions = {
+            "pending": {"reserved", "cancelled"},
+            "reserved": {"paid", "cancelled"},
+            "paid": {"shipped", "cancelled"},
+            "shipped": {"delivered"},
+            "delivered": set(), "cancelled": set(),
+        }
+        previous = order.status
+        deducted = order.inventory_deducted
+        if new_status not in transitions.get(previous, set()):
+            raise ValueError(f"No se puede cambiar el pedido de {previous} a {new_status}.")
+        reserve = new_status == "reserved"
+        restore = new_status == "cancelled" and deducted
+        quantities = _inventory_lines(order.items) if reserve or restore else {}
+        products = {p.id: p for p in db.query(Product).populate_existing().filter(
+            Product.id.in_(sorted({pid for pid, _ in quantities}))).order_by(Product.id).with_for_update().all()} if quantities else {}
+        # Compare-and-swap del estado y marcador antes de cualquier ajuste.
+        result = db.execute(update(Order).where(Order.id == order_id, Order.status == previous,
+            Order.inventory_deducted == deducted).values(status=new_status,
+            inventory_deducted=True if reserve else False if restore else deducted)
+            .execution_options(synchronize_session=False))
+        if result.rowcount != 1:
+            raise InventoryConflict("order_conflict", "El estado del pedido cambió. Actualiza la bandeja.")
+        if reserve:
+            _check_available(db, products, quantities)
+        for (pid, vid), quantity in quantities.items():
+            target = _stock_target(db, products.get(pid), vid)
+            if target is None:
+                raise InventoryConflict("stock_conflict", "La estructura del producto cambió. Revisa el pedido.")
+            model = Product if vid is None else ProductVariant
+            condition = model.stock_quantity >= quantity if reserve else model.stock_quantity <= 2147483647 - quantity
+            result = db.execute(update(model).where(model.id == target.id, condition)
+                .values(stock_quantity=model.stock_quantity - quantity if reserve else model.stock_quantity + quantity)
+                .execution_options(synchronize_session=False))
+            if result.rowcount != 1:
+                code = "insufficient_stock" if reserve else "stock_conflict"
+                raise InventoryConflict(code, "El stock cambió o excede el máximo. Revisa las existencias.")
+        db.commit()
+        db.refresh(order)
+        return order
+    except Exception:
         db.rollback()
-        raise ValueError("El estado del pedido cambió. Actualiza los pedidos antes de continuar.")
-    db.commit()
-    db.refresh(order)
-    return order
+        raise

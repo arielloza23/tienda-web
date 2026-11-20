@@ -150,7 +150,7 @@ La interfaz está en `/#/admin` (en Pages, `/tienda-web/#/admin`). Permite inici
 sesión con un administrador, crear productos activos o borradores, agregar sus
 variantes, subir portada y hasta 12 fotos de galería, y ordenar las fotos.
 El precio base y los ajustes se muestran en USD; la API recibe centavos enteros.
-No incorpora stock ni crea cuentas administrativas desde el navegador.
+Permite ajustar stock por talla y color; no crea cuentas administrativas desde el navegador.
 
 - `GET /api/v1/products/admin`: listado privado con activos e inactivos.
 - `POST /api/v1/products`: creación con sus atributos y variantes.
@@ -299,3 +299,51 @@ sobre una base real como prueba.
 Las transiciones administrativas de pedidos se guardan con comparación del estado
 previo: si otro administrador lo cambió simultáneamente, se rechaza el segundo
 cambio y se solicita actualizar la bandeja. No sobrescribe una cancelación o envío.
+
+
+## Inventario y reservas manuales
+
+La migración `20261120_inventory` inicializa una unidad por variante existente
+(talla/color), y una unidad base para productos sin variantes. No descuenta ventas
+históricas: `orders.inventory_deducted` comienza en false para todos los pedidos.
+La respuesta `ProductRead.stock_quantity` es la suma de variantes cuando existen;
+cada variante incluye sus propias unidades. El escaparate oculta productos y tallas sin existencias; administración conserva
+todos los productos para ajustar stock. El catálogo de la API conserva los registros
+activos para reconciliar el carrito con la disponibilidad actual.
+
+Crear un pedido comprueba stock disponible, sin apartarlo. Varios pedidos
+pendientes pueden solicitar la misma última unidad; únicamente el administrador
+la aparta con `pending -> reserved`. La reserva agrupa líneas repetidas y descuenta
+todas sus unidades en una sola transacción. Si falta alguna, devuelve 409 con
+`detail.code=insufficient_stock`, sin cambiar el pedido ni descontar otras líneas.
+
+Transiciones: `pending -> reserved|cancelled`, `reserved -> paid|cancelled`,
+`paid -> shipped|cancelled`, `shipped -> delivered`. Cancelar una reserva o venta
+que descontó inventario devuelve sus unidades exactamente una vez. Cancelar un
+pedido antiguo sin marcador no incrementa inventario. Pagar una reserva no vuelve
+a descontar. No hay caducidad automática de reservas ni cancelación tras envío.
+Los cambios concurrentes de estado devuelven 409 `order_conflict`; las transiciones
+no permitidas siguen devolviendo 400. El servidor conserva precios históricos.
+
+`PATCH /api/v1/products/{product_id}/stock` exige administrador autenticado,
+incluso con bypass de desarrollo. Recibe `variant_id` (null únicamente sin
+variantes), `quantity` y `expected_quantity`, enteros estrictos entre 0 y
+2147483647. `quantity` son las unidades disponibles que quedarán después del
+ajuste, excluyendo unidades ya reservadas. Si cambió la cantidad observada,
+devuelve 409 `stock_conflict` para recargar antes de ajustar. Cancelar devuelve
+unidades sobre el disponible actual; si supera el máximo, rechaza toda la
+cancelación con 409, sin perder la reserva. La base también exige esos límites.
+
+POST permite `stock_quantity` inicial (por defecto 1) en producto y variantes.
+PUT conserva stock de registros existentes, aunque reciba cantidades antiguas;
+solo variantes nuevas toman su cantidad inicial. Usar PATCH para ajustar stock.
+Al retirar todas las variantes no referenciadas, el producto simple comienza
+con stock 0; ajustar explícitamente sus unidades con PATCH evita reactivar el
+campo base que estaba dormido.
+No se pueden agregar variantes a un producto con líneas sin talla cuyo pedido
+ya descontó stock; un pendiente sin talla tampoco puede reservar tras convertir
+el producto a variantes. Se conserva el historial de variantes referenciadas.
+
+Validar migraciones solo en bases temporales. El downgrade retira los campos
+y sus cantidades, y se rechaza si existen reservas o pedidos que descontaron
+stock. No usarlo como forma de deshacer ventas ni como prueba en datos reales.

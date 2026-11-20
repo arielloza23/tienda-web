@@ -18,7 +18,7 @@
 
   <main class="content" id="top">
     <app-product-showcase
-      [products]="products()"
+      [products]="availableProducts()"
       [(selectedProductId)]="featuredProductId"
       (addProduct)="addToCart($event.product, $event.variant)"
     />
@@ -63,7 +63,7 @@
         <div class="state-card">Cargando productos...</div>
       } @else if (error()) {
         <div class="state-card error" role="alert"><p>{{ error() }}</p><button type="button" class="retry-button" (click)="loadProducts()">Volver a intentar</button></div>
-      } @else if (products().length === 0) {
+      } @else if (availableProducts().length === 0) {
         <div class="state-card">No hay productos disponibles.</div>
       } @else if (visibleProducts().length === 0) {
         <div class="state-card catalog-empty"><p>No encontramos diseños con estos filtros.</p><button type="button" class="retry-button" (click)="clearCatalogFilters()">Ver toda la colección</button></div>
@@ -71,10 +71,11 @@
         @if (hasCatalogFilters()) { <p class="catalog-price-note">Los precios corresponden a las opciones que coinciden con tus filtros. Elige tu talla y color en la portada.</p> }
         <div class="product-miniatures" role="group" aria-label="Abrir un producto en la portada">
           @for (product of visibleProducts(); track product.id) {
-            <button type="button" class="product-miniature" [class.is-active]="(featuredProductId() ?? products()[0]?.id) === product.id"
-              [attr.aria-pressed]="(featuredProductId() ?? products()[0]?.id) === product.id" (click)="showProduct(product)">
+            <button type="button" class="product-miniature" [class.is-active]="(featuredProductId() ?? availableProducts()[0]?.id) === product.id"
+              [attr.aria-pressed]="(featuredProductId() ?? availableProducts()[0]?.id) === product.id" (click)="showProduct(product)">
               <span class="miniature-image"><img [src]="productImage(product)" [alt]="product.name" loading="lazy" /><span class="miniature-open" aria-hidden="true">↗</span></span>
               <span class="miniature-name">{{ product.name }}</span>
+              @if (product.stock_quantity === 0) { <span>Agotado</span> }
               <span class="miniature-price">{{ catalogHasPriceRange(product) ? 'Desde ' : '' }}{{ catalogPrice(product) / 100 | currency: 'USD' }}</span>
             </button>
           }
@@ -103,6 +104,7 @@
               </div>
               <ul class="receipt-items">@for (item of confirmation.items; track $index) { <li>{{ item.product_name }} {{ item.variant_label ? '(' + item.variant_label + ')' : '' }} × {{ item.quantity }} — {{ item.total_price_cents / 100 | currency: 'USD' }}</li> }</ul>
               <p class="confirmation-note">Envío y pago: por coordinar por WhatsApp.</p>
+              <p class="confirmation-note">Tu pedido queda pendiente. Las unidades se apartarán cuando confirmemos la reserva.</p>
               <p class="confirmation-note">Comprobante guardado en esta pestaña durante 24 horas. Estado al registrar: {{ confirmation.status }}. Este resumen no muestra seguimiento en vivo.</p>
               <p class="confirmation-note">
                 Tu pedido ya está registrado. Toca el botón para continuar en WhatsApp y coordinar el envío y el pago.
@@ -150,7 +152,7 @@
                         −
                       </button>
                       <span>{{ item.quantity }}</span>
-                      <button type="button" [attr.aria-label]="'Añadir una unidad de ' + cartItemDescription(item)" [disabled]="isSubmittingOrder() || item.quantity >= 100" (click)="increaseQuantity(item)">
+                      <button type="button" [attr.aria-label]="'Añadir una unidad de ' + cartItemDescription(item)" [disabled]="isSubmittingOrder() || item.quantity >= quantityLimit(item)" (click)="increaseQuantity(item)">
                         +
                       </button>
                     </div>

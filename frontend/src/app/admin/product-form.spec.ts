@@ -52,4 +52,34 @@ describe('Product form', () => {
     expect(() => productRequest({ ...draft, variants: [...draft.variants, ...draft.variants] })).toThrow();
     expect(() => productRequest({ ...draft, images: [{ url: 'https://example.com/a.webp', alt: 'Foto frontal', color: 'Negro' }] })).toThrow();
   });
+  it('sets initial stock and never overwrites existing inventory during a general edit', () => {
+    const product = { id: 7, name: 'Body', slug: 'body', price_cents: 1200, is_active: true, stock_quantity: 6,
+      variants: [{ id: 9, sku: 'BODY-M', size: 'M', price_adjustment_cents: 0, stock_quantity: 6 }] };
+    const draft = productToDraft(product);
+    draft.variants.push({ sku: 'BODY-L', size: 'L', color: '', adjustment: '0', stock_quantity: 2 });
+    const update = productUpdateRequest(draft);
+    expect(update).not.toHaveProperty('stock_quantity');
+    expect(update.variants[0]).not.toHaveProperty('stock_quantity');
+    expect(update.variants[1].stock_quantity).toBe(2);
+    const creation = productRequest({ ...emptyProductDraft(), name: 'Body', slug: 'body', price: '12' });
+    expect(creation.stock_quantity).toBe(1);
+    expect(() => productRequest({ ...draft, stock_quantity: -1 })).toThrow();
+  });
+
+  it('does not validate aggregate or existing stock when saving product details', () => {
+    const draft = productToDraft({ id: 7, name: 'Body', slug: 'body', price_cents: 1200, is_active: true,
+      stock_quantity: 2 * 2147483647, variants: [
+        { id: 1, sku: 'BODY-M', size: 'M', stock_quantity: 2147483647, price_adjustment_cents: 0 },
+        { id: 2, sku: 'BODY-L', size: 'L', stock_quantity: 2147483647, price_adjustment_cents: 0 },
+      ] });
+    draft.name = 'Body actualizado';
+    // Incluso un valor obsoleto inválido del editor no participa en este guardado.
+    draft.variants[0].stock_quantity = -1;
+    const update = productUpdateRequest(draft);
+    expect(update.name).toBe('Body actualizado'); expect(update).not.toHaveProperty('stock_quantity');
+    expect(update.variants.every(variant => !('stock_quantity' in variant))).toBe(true);
+    draft.variants.push({ sku: 'BODY-S', size: 'S', color: '', adjustment: '0', stock_quantity: -1 });
+    expect(() => productUpdateRequest(draft)).toThrow();
+  });
+
 });

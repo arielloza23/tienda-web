@@ -4,20 +4,21 @@ import { catchError, Observable, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AdminAuth } from './auth.service';
 
-export type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'reserved' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
 export interface AdminOrder {
   id: number; user_id: number | null; customer_name: string | null; customer_phone: string | null;
   delivery_address: string | null; delivery_latitude?: number | null; delivery_longitude?: number | null;
   created_at: string; status: OrderStatus; subtotal_cents: number; shipping_total_cents: number;
+  inventory_deducted?: boolean;
   tax_total_cents: number; total_cents: number;
   items: Array<{ id: number; product_id: number; variant_id: number | null; product_name: string;
     variant_label: string | null; unit_price_cents: number; quantity: number; total_price_cents: number }>;
 }
 export const ORDER_LABELS: Record<OrderStatus, string> = {
-  pending: 'Pendiente', paid: 'Pagado', shipped: 'Enviado', delivered: 'Entregado', cancelled: 'Cancelado',
+  pending: 'Pendiente', reserved: 'Reservado', paid: 'Pagado', shipped: 'Enviado', delivered: 'Entregado', cancelled: 'Cancelado',
 };
 export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ['paid', 'cancelled'], paid: ['shipped', 'cancelled'], shipped: ['delivered'], delivered: [], cancelled: [],
+  pending: ['reserved', 'cancelled'], reserved: ['paid', 'cancelled'], paid: ['shipped', 'cancelled'], shipped: ['delivered'], delivered: [], cancelled: [],
 };
 @Injectable({ providedIn: 'root' })
 export class OrdersApi {

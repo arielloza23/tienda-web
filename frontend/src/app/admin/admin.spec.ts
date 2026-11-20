@@ -18,7 +18,7 @@ const product: Product = { id: 7, name: 'Body', slug: 'body-vino', price_cents: 
 describe('Admin editing', () => {
   async function setup() {
     const response = new Subject<Product>();
-    const api = { list: vi.fn(() => of([product])), update: vi.fn(() => response), create: vi.fn() };
+    const api = { updateStock: vi.fn(() => response), list: vi.fn(() => of([product])), update: vi.fn(() => response), create: vi.fn() };
     const auth = { user: signal({ email: 'admin@example.com', full_name: 'Admin' }), logout: vi.fn() };
     TestBed.configureTestingModule({ imports: [Admin], providers: [provideRouter([]), { provide: AdminApi, useValue: api }, { provide: AdminAuth, useValue: auth }] });
     const fixture = TestBed.createComponent(Admin); fixture.detectChanges(); await fixture.whenStable();
@@ -49,4 +49,16 @@ describe('Admin editing', () => {
     expect(newForm).not.toBe(form); expect(newForm.pristine).toBe(true); expect(newForm.untouched).toBe(true);
     expect(editor['editingId']()).toBeNull(); expect(product.variants[0].sku).toBe('BODY-M');
   });
+  it('uses compare-and-swap for stock, reloads conflicts and preserves the product draft', async () => {
+    const { editor, response, api } = await setup();
+    const stocked = { ...product, stock_quantity: 1, variants: [{ ...product.variants[0], stock_quantity: 1 }] };
+    editor['editProduct'](stocked); editor['draft'].name = 'Cambios sin guardar';
+    editor['openStock'](stocked, 23); editor['stockInput'] = 3; editor['saveStock']();
+    expect(api.updateStock).toHaveBeenCalledWith(7, 23, 3, 1);
+    editor['saveStock'](); expect(api.updateStock).toHaveBeenCalledTimes(1);
+    response.error(new HttpErrorResponse({ status: 409, error: { detail: { code: 'stock_conflict', message: 'El stock cambió.' } } }));
+    expect(editor['stockError']()).toBe('El stock cambió.'); expect(api.list).toHaveBeenCalledTimes(2);
+    expect(editor['draft'].name).toBe('Cambios sin guardar'); expect(editor['stockEditor']()).toBeNull();
+  });
+
 });

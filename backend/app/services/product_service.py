@@ -1,11 +1,12 @@
 from typing import Optional
 
+from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.order import OrderItem
+from app.models.order import Order, OrderItem
 from app.models.product import Product, ProductImage, ProductVariant
-from app.schemas.product import ProductCreate, ProductUpdate
+from app.schemas.product import ProductCreate, ProductUpdate, ProductStockUpdate
 
 
 class ProductConflict(ValueError):
@@ -36,6 +37,7 @@ def create_product(db: Session, payload: ProductCreate) -> Product:
         price_cents=payload.price_cents,
         is_active=payload.is_active,
         image_url=payload.image_url,
+        stock_quantity=payload.stock_quantity,
     )
 
     _validate_variants(db, payload)
@@ -111,11 +113,18 @@ def update_product(db: Session, product_id: int, payload: ProductUpdate) -> Prod
     omitted_ids = set(current) - retained_ids
     if omitted_ids and db.query(OrderItem.id).filter(OrderItem.variant_id.in_(omitted_ids)).first() is not None:
         raise ProductConflict("No se puede eliminar una variante usada en pedidos. Consérvala para mantener el historial.")
+    if not current and payload.variants and db.query(OrderItem.id).join(Order).filter(
+        OrderItem.product_id == product_id, OrderItem.variant_id.is_(None), Order.inventory_deducted.is_(True)
+    ).first() is not None:
+        raise ProductConflict("No se pueden agregar variantes mientras existan pedidos que descontaron stock sin talla.")
     _validate_variants(db, payload)
     images = _validated_images(payload)
 
     # Ningún atributo persistente se cambia antes de completar todas las validaciones.
-    for field, value in payload.model_dump(exclude={"variants", "images"}).items():
+    if current and not payload.variants:
+        # El campo base estaba dormido: no representa las unidades de las tallas retiradas.
+        product.stock_quantity = 0
+    for field, value in payload.model_dump(exclude={"variants", "images", "stock_quantity"}).items():
         setattr(product, field, value)
     variants = []
     for variant in payload.variants:
@@ -124,6 +133,7 @@ def update_product(db: Session, product_id: int, payload: ProductUpdate) -> Prod
             instance = ProductVariant(**values)
         else:
             instance = current[variant.id]
+            values.pop("stock_quantity", None)
             # Clientes anteriores omiten medidas: conservarlas; null explícito las borra.
             for measure in ("bust_cm", "waist_cm", "hip_cm"):
                 if measure not in variant.model_fields_set:
@@ -148,3 +158,34 @@ def update_product(db: Session, product_id: int, payload: ProductUpdate) -> Prod
         raise
     db.refresh(product)
     return product
+
+
+class StockConflict(ProductConflict):
+    def __init__(self, message):
+        self.detail = {"code": "stock_conflict", "message": message}
+        super().__init__(message)
+
+
+def update_stock(db: Session, product_id: int, payload: ProductStockUpdate) -> Product | None:
+    try:
+        product = db.query(Product).filter(Product.id == product_id).with_for_update().first()
+        if product is None:
+            return None
+        if payload.variant_id is None:
+            if product.variants:
+                raise ValueError("Selecciona la talla o variante para ajustar el stock.")
+            model, target_id = Product, product_id
+        else:
+            if not any(v.id == payload.variant_id for v in product.variants):
+                raise ValueError("La variante no pertenece a este producto.")
+            model, target_id = ProductVariant, payload.variant_id
+        result = db.execute(update(model).where(model.id == target_id, model.stock_quantity == payload.expected_quantity)
+            .values(stock_quantity=payload.quantity).execution_options(synchronize_session=False))
+        if result.rowcount != 1:
+            raise StockConflict("El stock cambió. Recarga el producto antes de ajustar las unidades.")
+        db.commit()
+        db.expire_all()
+        return db.get(Product, product_id)
+    except Exception:
+        db.rollback()
+        raise

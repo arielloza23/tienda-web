@@ -41,3 +41,21 @@ describe('Checkout price reconfirmation and receipt', () => {
     } finally { popup.mockRestore(); }
   });
 });
+
+describe('Checkout availability conflict', () => {
+  it('keeps delivery details and shows the refreshed stock without a false confirmation', () => {
+    localStorage.clear(); sessionStorage.clear();
+    const orders = { createOrder: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 409,
+      error: { detail: { code: 'insufficient_stock', message: 'No hay unidades suficientes.' } } }))) };
+    TestBed.configureTestingModule({ providers: [provideRouter([]), provideHttpClient(), { provide: OrderService, useValue: orders },
+      { provide: ProductService, useValue: { getProducts: () => of([{ ...product, stock_quantity: 1 }]) } }] });
+    const app = TestBed.createComponent(Storefront).componentInstance as any;
+    const cart = TestBed.inject(CartService); cart.reconcile([product]); cart.add(product); cart.add(product);
+    app.customerName.set('Cliente'); app.deliveryAddress.set('Dirección guardada'); app.deliveryLocation.set({ latitude: -1, longitude: -79 });
+    app.placeOrder();
+    expect(app.orderConfirmation()).toBeNull(); expect(cart.count()).toBe(1);
+    expect(app.customerName()).toBe('Cliente'); expect(app.deliveryAddress()).toBe('Dirección guardada');
+    expect(app.checkoutError()).toContain('suficientes'); expect(cart.notice()).toContain('Ajustamos');
+    expect(orders.createOrder).toHaveBeenCalledTimes(1);
+  });
+});

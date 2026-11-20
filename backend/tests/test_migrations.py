@@ -197,5 +197,41 @@ def test_checkout_recovery_preserves_data_on_upgrade_and_reupgrade(alembic_db):
         assert connection.execute(text("SELECT id, sku, size, color FROM product_variants ORDER BY id")).all() == before
         assert connection.execute(text("SELECT total_cents FROM orders WHERE id=999")).scalar_one() == 100
         assert connection.execute(text("SELECT email FROM users WHERE id=999")).scalar_one() == "temp@example.com"
-    command.upgrade(config, "20261116_checkout_recovery")
+    command.upgrade(config, "head")
     assert _schema_diff(engine) == []
+
+
+def test_inventory_migration_initializes_once_and_preserves_legacy_orders(alembic_db):
+    config, engine = alembic_db
+    command.upgrade(config, '20261116_catalog_products')
+    with engine.begin() as c:
+        c.execute(text("INSERT INTO orders (id,status,subtotal_cents,total_cents,shipping_total_cents,tax_total_cents,created_at) VALUES (987,'paid',1500,1500,0,0,CURRENT_TIMESTAMP)"))
+        products = c.execute(text('SELECT id,name,price_cents FROM products ORDER BY id')).all()
+        variants = c.execute(text('SELECT id,sku,size,color FROM product_variants ORDER BY id')).all()
+    command.upgrade(config, 'head')
+    with engine.begin() as c:
+        assert c.execute(text('SELECT id,name,price_cents FROM products ORDER BY id')).all() == products
+        assert c.execute(text('SELECT id,sku,size,color FROM product_variants ORDER BY id')).all() == variants
+        assert c.execute(text('SELECT stock_quantity FROM product_variants')).scalars().all() == [1] * len(variants)
+        assert c.execute(text('SELECT stock_quantity FROM products')).scalars().all() == [1] * len(products)
+        assert not c.execute(text('SELECT inventory_deducted FROM orders WHERE id=987')).scalar_one()
+        c.execute(text('UPDATE product_variants SET stock_quantity=5 WHERE id=:id'), {'id': variants[0].id})
+    command.upgrade(config, 'head')
+    with engine.connect() as c:
+        assert c.execute(text('SELECT stock_quantity FROM product_variants WHERE id=:id'), {'id': variants[0].id}).scalar_one() == 5
+        assert c.execute(text('SELECT status,total_cents FROM orders WHERE id=987')).one() == ('paid',1500)
+    command.downgrade(config, '20261116_catalog_products')
+    command.upgrade(config, 'head')
+    assert _schema_diff(engine) == []
+
+
+def test_inventory_migration_downgrade_refuses_losing_reservations(alembic_db):
+    config, engine = alembic_db
+    command.upgrade(config, 'head')
+    with engine.begin() as c:
+        c.execute(text("INSERT INTO orders (id,status,inventory_deducted,subtotal_cents,total_cents,shipping_total_cents,tax_total_cents,created_at) VALUES (988,'reserved',true,100,100,0,0,CURRENT_TIMESTAMP)"))
+    with pytest.raises(RuntimeError, match='inventario'):
+        command.downgrade(config, '20261116_catalog_products')
+    with engine.connect() as c:
+        assert c.execute(text('SELECT status,inventory_deducted FROM orders WHERE id=988')).one() == ('reserved',True)
+        assert c.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '20261120_inventory'

@@ -10,7 +10,7 @@ import { Product } from '../models/product.model';
 import { AdminAuth } from './auth.service';
 import { AdminOrders } from './orders';
 import { AdminApi } from './admin-api.service';
-import { emptyProductDraft, productRequest, productToDraft, productUpdateRequest } from './product-form';
+import { emptyProductDraft, productRequest, productToDraft, productUpdateRequest, stockQuantity } from './product-form';
 
 @Component({ imports: [CommonModule, FormsModule, RouterLink, AdminOrders], templateUrl: './admin.html', styleUrl: './admin.scss' })
 export class Admin implements OnInit {
@@ -23,6 +23,46 @@ export class Admin implements OnInit {
   protected loginPassword = '';
   protected readonly loggingIn = signal(false);
   protected readonly saving = signal(false);
+  protected readonly savingStock = signal(false);
+  protected readonly stockEditor = signal<{ productId: number; variantId: number | null; expected: number; label: string } | null>(null);
+  protected stockInput = 1;
+  protected readonly stockError = signal('');
+  protected readonly stockSuccess = signal('');
+  protected openStock(product: Product, variantId: number | null): void {
+    if (this.busy()) return;
+    const quantity = variantId === null ? product.stock_quantity : product.variants.find(v => v.id === variantId)?.stock_quantity;
+    if (quantity === undefined) { this.stockError.set('Actualiza el catálogo para cargar el stock.'); return; }
+    const variant = product.variants.find(v => v.id === variantId);
+    this.stockEditor.set({ productId: product.id, variantId, expected: quantity, label: [product.name, variant?.size, variant?.color].filter(Boolean).join(' · ') });
+    this.stockInput = quantity; this.stockError.set(''); this.stockSuccess.set('');
+  }
+  protected saveStock(): void {
+    const editor = this.stockEditor();
+    if (!editor || this.busy() || !this.auth.user()) return;
+    try {
+      if (typeof this.stockInput !== 'number') throw new Error('Escribe el stock disponible.');
+      const quantity = stockQuantity(this.stockInput);
+      this.savingStock.set(true); this.stockError.set(''); this.stockSuccess.set('');
+      this.api.updateStock(editor.productId, editor.variantId, quantity, editor.expected)
+        .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.savingStock.set(false))).subscribe({
+          next: product => {
+            this.products.update(products => products.map(p => p.id === product.id ? product : p));
+            this.stockEditor.set(null); this.stockSuccess.set('Stock disponible actualizado.');
+          },
+          error: (error: HttpErrorResponse) => {
+            this.stockError.set(error.error?.detail?.message || 'No se pudo guardar el stock. Actualiza y vuelve a intentarlo.');
+            if (error.status === 409) {
+              this.stockEditor.set(null);
+              this.api.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+                next: products => this.products.set(products),
+                error: () => this.stockError.update(message => message + ' No pudimos recargar el catálogo. Pulsa Actualizar.'),
+              });
+            }
+            if (error.status === 401 || error.status === 403) this.showError(error);
+          },
+        });
+    } catch (error) { this.stockError.set(error instanceof Error ? error.message : 'Revisa el stock.'); }
+  }
   protected readonly uploading = signal(false);
   protected readonly loadingProducts = signal(false);
   protected readonly error = signal('');
@@ -33,7 +73,7 @@ export class Admin implements OnInit {
   protected readonly formVersion = signal(0);
   private readonly formTitle = viewChild<ElementRef<HTMLHeadingElement>>('formTitle');
   private readonly injector = inject(Injector);
-  protected busy(): boolean { return this.saving() || this.uploading() || this.loadingProducts(); }
+  protected busy(): boolean { return this.savingStock() || this.saving() || this.uploading() || this.loadingProducts(); }
   private resetEditor(): void {
     this.editingId.set(null); this.draft = emptyProductDraft(); this.formVersion.update((version) => version + 1);
   }
@@ -73,7 +113,7 @@ export class Admin implements OnInit {
     if (!this.draft.slug) this.draft.slug = this.draft.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 200);
   }
   protected galleryColors(): string[] { return [...new Set(this.draft.variants.map((variant) => variant.color.trim()).filter(Boolean))]; }
-  protected addVariant(): void { if (this.draft.variants.length < 100) this.draft.variants.push({ sku: '', size: '', color: '', adjustment: '0.00' }); }
+  protected addVariant(): void { if (this.draft.variants.length < 100) this.draft.variants.push({ sku: '', size: '', color: '', adjustment: '0.00', stock_quantity: 1 }); }
   protected removeVariant(index: number): void { this.draft.variants.splice(index, 1); }
   protected addImage(): void {
     if (this.draft.images.length < 12) this.draft.images.push({ url: '', alt: this.draft.name.slice(0, 200), color: this.galleryColors()[0] || 'Único' });
@@ -98,7 +138,7 @@ export class Admin implements OnInit {
     });
   }
   protected saveProduct(): void {
-    if (this.saving() || this.uploading() || this.loadingProducts() || !this.auth.user()) return;
+    if (this.busy() || !this.auth.user()) return;
     this.error.set(''); this.success.set('');
     try {
       const editingId = this.editingId();

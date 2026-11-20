@@ -60,3 +60,5 @@ button:disabled,fieldset:disabled .button { cursor:wait; opacity:.55; } .order-a
 .measurement-heading { margin-top:20px; }
 .measurement-fields { grid-template-columns:repeat(3,minmax(0,1fr)); }
 @media(max-width:600px) { .measurement-fields { grid-template-columns:1fr; } }
+
+.stock-row { display: flex; flex-wrap: wrap; gap: .35rem .7rem; align-items: center; margin-block: .5rem; }

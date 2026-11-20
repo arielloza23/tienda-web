@@ -4,12 +4,13 @@
     <legend>Elige talla y color</legend>
     @for (variant of variants(); track variant.id) {
       <button type="button" [class.selected]="selectedId() === variant.id" [attr.aria-pressed]="selectedId() === variant.id"
-        [attr.aria-label]="variantLabel(variant)"
+        [attr.aria-label]="variantLabel(variant)" [disabled]="variant.stock_quantity === 0"
         (click)="selectVariant.emit(variant.id)">
         <strong>{{ variant.size?.trim() || 'Talla no especificada' }}</strong>
         <span>{{ variant.color?.trim() || 'Color no especificado' }}</span>
         @if (!variant.size?.trim() && !variant.color?.trim()) { <small>Referencia: {{ variant.sku }}</small> }
         @if (variant.price_adjustment_cents) { <small>{{ variant.price_adjustment_cents > 0 ? '+' : '' }}{{ variant.price_adjustment_cents / 100 | currency: 'USD' }}</small> }
+        @if (variant.stock_quantity !== undefined) { <small>{{ variant.stock_quantity === 0 ? 'Agotado' : variant.stock_quantity + ' disponibles' }}</small> }
         @if (selectedId() === variant.id) { <small class="selected-label">✓ Tu elección</small> }
       </button>
     }

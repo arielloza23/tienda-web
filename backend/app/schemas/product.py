@@ -7,6 +7,7 @@ class ProductVariantBase(BaseModel):
     sku: str = Field(..., min_length=3, max_length=100)
     size: Optional[str] = Field(default=None, max_length=50)
     color: Optional[str] = Field(default=None, max_length=50)
+    stock_quantity: int = Field(default=1, ge=0, le=2147483647, strict=True)
     price_adjustment_cents: int = Field(default=0, ge=0, le=2147483647, strict=True)
 
     bust_cm: float | None = Field(default=None, gt=0, le=300, multiple_of=0.1, allow_inf_nan=False, strict=True)
@@ -36,6 +37,7 @@ class ProductBase(BaseModel):
     description: Optional[str] = Field(default=None, max_length=5000)
     price_cents: int = Field(..., ge=0, le=2147483647, strict=True)
     is_active: bool = True
+    stock_quantity: int = Field(default=1, ge=0, le=2147483647, strict=True)
 
     model_config = ConfigDict(str_strip_whitespace=True)
     image_url: Optional[str] = Field(default=None, max_length=500, pattern=r"^https://\S+$")
@@ -78,7 +80,16 @@ class ProductUpdate(ProductBase):
 
 class ProductRead(ProductBase):
     id: int
+    stock_quantity: int = Field(validation_alias="available_stock_quantity")
     variants: list[ProductVariantRead] = Field(default_factory=list)
     images: list[ProductImageRead] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProductStockUpdate(BaseModel):
+    variant_id: int | None = Field(default=None, strict=True, gt=0, le=2147483647)
+    quantity: int = Field(ge=0, le=2147483647, strict=True)
+    expected_quantity: int = Field(ge=0, le=2147483647, strict=True)
+
+    model_config = ConfigDict(extra="forbid")

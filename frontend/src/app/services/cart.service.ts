@@ -1,5 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { CartItem, Product, ProductVariant } from '../models/product.model';
+import { availableQuantity, CartItem, Product, ProductVariant } from '../models/product.model';
 
 export const CART_STORAGE_KEY = 'tienda.cart.v1';
 export const MAX_CART_LINES = 50;
@@ -20,27 +20,33 @@ export class CartService {
     const saved = this.restored ? this.serialize() : this.read();
     this.restored = true;
     const lines: CartItem[] = [];
+    let adjusted = false;
     for (const line of saved) {
       const product = products.find((entry) => entry.id === line.product_id && entry.is_active);
       if (!product) continue;
       const variant = line.variant_id === null ? null : product.variants.find((entry) => entry.id === line.variant_id);
       if ((line.variant_id !== null && !variant) || (!variant && product.variants.length > 0)) continue;
+      const limit = availableQuantity(product, variant ?? null);
+      if (!limit) { adjusted = true; continue; }
+      const quantity = Math.min(line.quantity, limit);
+      if (quantity !== line.quantity) adjusted = true;
       const duplicate = lines.find((entry) => entry.product.id === product.id && entry.variant?.id === variant?.id);
       if (duplicate) {
-        duplicate.quantity = Math.min(MAX_ITEM_QUANTITY, duplicate.quantity + line.quantity);
+        duplicate.quantity = Math.min(limit, duplicate.quantity + quantity);
       } else {
-        lines.push({ product, variant: variant ?? null, quantity: line.quantity });
+        lines.push({ product, variant: variant ?? null, quantity });
       }
     }
     this.state.set(lines);
     this.save();
-    if (saved.length) this.notice.set('Carrito actualizado con los precios y la disponibilidad del catálogo.');
+    if (adjusted) this.notice.set('Ajustamos las cantidades a las unidades disponibles y retiramos las tallas agotadas. Revisa tu pedido antes de confirmar.');
+    else if (saved.length) this.notice.set('Carrito actualizado con los precios y la disponibilidad del catálogo.');
   }
 
   add(product: Product, variant: ProductVariant | null = null): boolean {
     const current = this.items().find((item) => this.same(item, product.id, variant?.id));
-    if ((current?.quantity ?? 0) >= MAX_ITEM_QUANTITY) {
-      this.notice.set('Puedes pedir hasta 100 unidades de la misma talla y color.');
+    if ((product.variants.length > 0 && !variant) || (current?.quantity ?? 0) >= availableQuantity(product, variant)) {
+      this.notice.set(availableQuantity(product, variant) === 0 ? 'Esta talla o producto está agotado.' : `Solo puedes añadir hasta ${availableQuantity(product, variant)} unidades disponibles de esta talla y color.`);
       return false;
     }
     if (!current && this.items().length >= MAX_CART_LINES) {

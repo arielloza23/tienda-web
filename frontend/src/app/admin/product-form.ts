@@ -3,11 +3,12 @@ import { ProductCreate, ProductUpdate } from './admin-api.service';
 
 export interface ProductDraft {
   name: string; slug: string; description: string; price: string; is_active: boolean; coverUrl: string;
-  variants: Array<{ id?: number; sku: string; size: string; color: string; adjustment: string; bust_cm?: string; waist_cm?: string; hip_cm?: string }>;
+  stock_quantity?: number;
+  variants: Array<{ stock_quantity?: number; id?: number; sku: string; size: string; color: string; adjustment: string; bust_cm?: string; waist_cm?: string; hip_cm?: string }>;
   images: Array<{ url: string; alt: string; color: string }>;
 }
 export function emptyProductDraft(): ProductDraft {
-  return { name: '', slug: '', description: '', price: '', is_active: true, coverUrl: '', variants: [], images: [] };
+  return { name: '', slug: '', description: '', price: '', is_active: true, coverUrl: '', stock_quantity: 1, variants: [], images: [] };
 }
 export function priceToCents(value: string): number {
   const normalized = value.trim().replace(',', '.');
@@ -26,6 +27,11 @@ export function measurement(value: string | undefined): number | null {
   }
   return number;
 }
+export function stockQuantity(value: number | undefined): number {
+  const quantity = value ?? 1;
+  if (!Number.isInteger(quantity) || quantity < 0 || quantity > 2147483647) throw new Error('El stock debe ser un número entero entre 0 y 2147483647.');
+  return quantity;
+}
 export function productRequest(draft: ProductDraft): ProductCreate {
   const price = priceToCents(draft.price);
   const skus = new Set<string>();
@@ -39,7 +45,7 @@ export function productRequest(draft: ProductDraft): ProductCreate {
     if (entry.size.trim().length > 50 || entry.color.trim().length > 50) throw new Error('La talla y el color admiten hasta 50 caracteres.');
     const adjustment = priceToCents(entry.adjustment);
     if (price + adjustment > 2147483647) throw new Error('El precio de una variante es demasiado alto.');
-    return { sku, size: entry.size.trim() || null, color: entry.color.trim() || null, price_adjustment_cents: adjustment, bust_cm: measurement(entry.bust_cm), waist_cm: measurement(entry.waist_cm), hip_cm: measurement(entry.hip_cm) };
+    return { stock_quantity: stockQuantity(entry.stock_quantity), sku, size: entry.size.trim() || null, color: entry.color.trim() || null, price_adjustment_cents: adjustment, bust_cm: measurement(entry.bust_cm), waist_cm: measurement(entry.waist_cm), hip_cm: measurement(entry.hip_cm) };
   });
   const colors = new Map(variants.filter((v) => v.color).map((v) => [v.color!.toLocaleLowerCase(), v.color!]));
   const seen = new Set<string>();
@@ -56,7 +62,7 @@ export function productRequest(draft: ProductDraft): ProductCreate {
   });
   if (draft.coverUrl && !draft.coverUrl.startsWith('https://')) throw new Error('La portada debe ser una foto subida correctamente.');
   return { name: draft.name.trim(), slug: draft.slug.trim(), description: draft.description.trim() || null,
-    price_cents: price, is_active: draft.is_active, image_url: draft.coverUrl || null, variants, images };
+    stock_quantity: stockQuantity(draft.stock_quantity), price_cents: price, is_active: draft.is_active, image_url: draft.coverUrl || null, variants, images };
 }
 
 function centsToPrice(cents: number): string {
@@ -65,16 +71,21 @@ function centsToPrice(cents: number): string {
 export function productToDraft(product: Product): ProductDraft {
   return {
     name: product.name, slug: product.slug, description: product.description || '',
-    price: centsToPrice(product.price_cents), is_active: product.is_active, coverUrl: product.image_url || '',
-    variants: product.variants.map((variant) => ({ id: variant.id, sku: variant.sku,
+    stock_quantity: product.stock_quantity, price: centsToPrice(product.price_cents), is_active: product.is_active, coverUrl: product.image_url || '',
+    variants: product.variants.map((variant) => ({ stock_quantity: variant.stock_quantity, id: variant.id, sku: variant.sku,
       size: variant.size || '', color: variant.color || '', adjustment: centsToPrice(variant.price_adjustment_cents), bust_cm: variant.bust_cm == null ? '' : String(variant.bust_cm), waist_cm: variant.waist_cm == null ? '' : String(variant.waist_cm), hip_cm: variant.hip_cm == null ? '' : String(variant.hip_cm) })),
     images: (product.images || []).map(({ url, alt, color }) => ({ url, alt, color })),
   };
 }
 export function productUpdateRequest(draft: ProductDraft): ProductUpdate {
-  const request = productRequest(draft);
-  return { ...request, variants: request.variants.map((variant, index) => {
+  // Las existencias actuales se guardan por separado; el total agregado puede superar int32.
+  const request = productRequest({ ...draft, stock_quantity: undefined,
+    variants: draft.variants.map(variant => variant.id === undefined ? variant : { ...variant, stock_quantity: undefined }),
+  });
+  const { stock_quantity, ...details } = request;
+  return { ...details, variants: request.variants.map((variant, index) => {
     const id = draft.variants[index].id;
-    return id === undefined ? variant : { ...variant, id };
+    const { stock_quantity, ...details } = variant;
+    return id === undefined ? variant : { ...details, id };
   }) };
 }

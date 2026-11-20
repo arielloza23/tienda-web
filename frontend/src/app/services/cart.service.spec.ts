@@ -100,3 +100,23 @@ describe('Cart persistence across visits', () => {
     expect(JSON.parse(localStorage.getItem(CART_STORAGE_KEY)!).items).toEqual([]);
   });
 });
+
+describe('Stock availability in cart', () => {
+  beforeEach(() => localStorage.clear());
+  it('caps a variant at its available units and refuses sold-out choices', () => {
+    const stocked = { ...product, stock_quantity: 1, variants: [{ ...product.variants[0], stock_quantity: 1 }] };
+    const cart = new CartService(); cart.reconcile([stocked]);
+    expect(cart.add(stocked, stocked.variants[0])).toBe(true);
+    expect(cart.add(stocked, stocked.variants[0])).toBe(false); expect(cart.count()).toBe(1);
+    const empty = { ...product, variants: [], stock_quantity: 0 };
+    expect(cart.add(empty)).toBe(false); expect(cart.notice()).toContain('agotado');
+  });
+  it('refreshes reduced stock and tells the customer before resubmitting', () => {
+    const cart = new CartService(); cart.reconcile([product]);
+    cart.add(product, product.variants[0]); cart.add(product, product.variants[0]);
+    cart.reconcile([{ ...product, variants: [{ ...product.variants[0], stock_quantity: 1 }] }]);
+    expect(cart.count()).toBe(1); expect(cart.notice()).toContain('Ajustamos');
+    cart.reconcile([{ ...product, variants: [{ ...product.variants[0], stock_quantity: 0 }] }]);
+    expect(cart.count()).toBe(0); expect(cart.notice()).toContain('agotadas');
+  });
+});

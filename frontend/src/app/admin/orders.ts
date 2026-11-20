@@ -25,7 +25,7 @@ export class AdminOrders implements OnInit {
   protected readonly cancelling = signal(false);
   protected readonly labels = ORDER_LABELS;
   protected readonly statuses = Object.keys(ORDER_LABELS) as OrderStatus[];
-  protected readonly actions: Record<OrderStatus, string> = { pending: '', paid: 'Marcar como pagado', shipped: 'Marcar como enviado', delivered: 'Marcar como entregado', cancelled: 'Cancelar pedido' };
+  protected readonly actions: Record<OrderStatus, string> = { pending: '', reserved: 'Reservar pedido', paid: 'Marcar como pagado', shipped: 'Marcar como enviado', delivered: 'Marcar como entregado', cancelled: 'Cancelar pedido' };
   constructor() {
     effect(() => { if (!this.auth.user()) { this.orders.set([]); this.selectedId.set(null); this.cancelling.set(false); } });
   }
@@ -53,7 +53,15 @@ export class AdminOrders implements OnInit {
         if (!this.auth.user()) return;
         this.orders.update((orders) => orders.map((item) => item.id === updated.id ? updated : item));
         this.success.set(`Pedido #${updated.id}: ${this.labels[updated.status]}.`);
-      }, error: (error) => this.showError(error),
+      }, error: (error) => {
+        this.showError(error);
+        if (error instanceof HttpErrorResponse && error.status === 409) {
+          this.api.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+            next: orders => { if (this.auth.user()) this.orders.set(orders); },
+            error: () => this.error.update(message => message + ' No pudimos recargar los pedidos. Pulsa Actualizar pedidos.'),
+          });
+        }
+      },
     });
   }
   private showError(error: unknown): void {
@@ -62,7 +70,8 @@ export class AdminOrders implements OnInit {
       if (error.status === 401 || error.status === 403) {
         this.orders.set([]); this.selectedId.set(null); this.auth.logout();
         message = 'Tu sesión venció o no tiene permisos. Inicia sesión nuevamente.';
-      } else if (typeof error.error?.detail === 'string') message = error.error.detail;
+      } else if (typeof error.error?.detail?.message === 'string') message = error.error.detail.message;
+      else if (typeof error.error?.detail === 'string') message = error.error.detail;
       else if (error.status === 0) message = 'No se pudo conectar. Comprueba tu conexión.';
     }
     this.error.set(message);

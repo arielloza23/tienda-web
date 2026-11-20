@@ -174,6 +174,8 @@ try:
         page.get_by_role('button',name='Cancelar pedido',exact=True).click()
         expect(page.get_by_role('button',name='Sí, cancelar pedido',exact=True)).to_be_visible()
         page.get_by_role('button',name='Conservar pedido',exact=True).click()
+        page.get_by_role('button',name='Reservar pedido',exact=True).click()
+        expect(page.locator('.detail h3')).to_contain_text('Reservado')
         page.get_by_role('button',name='Marcar como pagado',exact=True).click()
         expect(page.locator('.detail h3')).to_contain_text('Pagado')
         page.get_by_role('button',name='Marcar como enviado',exact=True).click()

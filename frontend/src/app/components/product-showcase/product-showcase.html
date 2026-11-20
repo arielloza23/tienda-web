@@ -44,8 +44,9 @@
         <p class="showcase-price">{{ price() / 100 | currency: 'USD' }} <span>USD</span></p>
         <p class="showcase-description">{{ featured.description || 'El encanto está en los pequeños detalles.' }}</p>
         <app-product-options [variants]="featured.variants" [selectedId]="variantId()" [productName]="featured.name" (selectVariant)="variantId.set($event)" />
-        <button type="button" class="showcase-add" [disabled]="!!featured.variants.length && !selectedVariant()" (click)="addToOrder()">
-          {{ featured.variants.length && !selectedVariant() ? 'Elige talla y color' : 'Añadir a mi pedido' }} <span aria-hidden="true">+</span>
+        @if (!featured.variants.length && featured.stock_quantity !== undefined) { <p>{{ featured.stock_quantity }} unidades disponibles</p> }
+        <button type="button" class="showcase-add" [disabled]="available() === 0 || (!!featured.variants.length && !selectedVariant())" (click)="addToOrder()">
+          {{ available() === 0 ? 'Agotado' : featured.variants.length && !selectedVariant() ? 'Elige talla y color' : 'Añadir a mi pedido' }} <span aria-hidden="true">+</span>
         </button>
         <button type="button" class="showcase-reviews" (click)="openReviews($event)" aria-haspopup="dialog" aria-controls="product-reviews-dialog" [attr.aria-label]="'Ver opiniones de ' + featured.name">
           <span aria-hidden="true">☆</span> Ver opiniones <span aria-hidden="true">↗</span>

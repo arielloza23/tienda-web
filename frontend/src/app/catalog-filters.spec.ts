@@ -54,3 +54,27 @@ describe('Catalog filters and effective variant prices', () => {
     expect(app.visibleProducts()).toEqual([product, basic]);
   });
 });
+
+
+describe('Sold-out catalog visibility', () => {
+  it('hides exhausted products and sizes from the showcase and catalog filters, then restores replenished stock', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter([])] });
+    const app = TestBed.createComponent(Storefront).componentInstance as any;
+    const soldOut = { ...product, variants: product.variants.map(v => ({ ...v, stock_quantity: 0 })) };
+    const mixed = { ...product, id: 3, variants: [
+      { ...product.variants[0], stock_quantity: 0 }, { ...product.variants[1], stock_quantity: 1 },
+    ] };
+    app.products.set([soldOut, { ...basic, stock_quantity: 0 }, mixed]);
+    expect(app.availableProducts().map((p: Product) => p.id)).toEqual([3]);
+    expect(app.availableProducts()[0].variants.map((v: { id: number }) => v.id)).toEqual([2]);
+    expect(app.visibleProducts()).toEqual(app.availableProducts());
+    expect(app.availableSizes()).toEqual(['Todas', 'M']);
+    expect(app.availableColors()).toEqual(['Todos', 'Negro']);
+    expect(mixed.variants).toHaveLength(2);
+    app.products.set([{ ...basic, stock_quantity: 1 }]);
+    expect(app.availableProducts()).toEqual([{ ...basic, stock_quantity: 1 }]);
+    app.products.set([{ ...basic, stock_quantity: 0 }]);
+    expect(app.availableProducts()).toEqual([]);
+    expect(app.visibleProducts()).toEqual([]);
+  });
+});

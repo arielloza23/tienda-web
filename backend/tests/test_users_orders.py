@@ -34,6 +34,7 @@ def test_create_order_success(client: TestClient) -> None:
         "price_cents": 199900,
         "is_active": True,
         "variants": [],
+        "stock_quantity": 100,
     }
     product_response = client.post("/api/v1/products", json=product_payload)
     assert product_response.status_code == 201
@@ -75,7 +76,7 @@ def test_create_order_success(client: TestClient) -> None:
     )
     assert invalid_transition.status_code == 400
 
-    for next_status in ("paid", "shipped", "delivered"):
+    for next_status in ("reserved", "paid", "shipped", "delivered"):
         response = client.patch(
             f"/api/v1/orders/{order_id}/status",
             params={"new_status": next_status},
@@ -90,7 +91,7 @@ def test_create_order_success(client: TestClient) -> None:
     assert terminal_transition.status_code == 400
 
 
-def test_create_order_does_not_require_stock(client: TestClient) -> None:
+def test_create_pending_order_does_not_deduct_stock(client: TestClient) -> None:
     product_response = client.post(
         "/api/v1/products",
         json={
@@ -99,6 +100,7 @@ def test_create_order_does_not_require_stock(client: TestClient) -> None:
             "price_cents": 59000,
             "is_active": True,
             "variants": [],
+            "stock_quantity": 100,
         },
     )
     assert product_response.status_code == 201
@@ -124,6 +126,7 @@ def test_create_order_does_not_require_stock(client: TestClient) -> None:
     )
     assert response.status_code == 201
     assert response.json()["items"][0]["quantity"] == 20
+    assert client.get(f"/api/v1/products/{product_response.json()['id']}").json()["stock_quantity"] == 100
 
 
 def test_guest_checkout_saves_delivery_data_and_variant_price(client: TestClient) -> None:
@@ -139,6 +142,7 @@ def test_guest_checkout_saves_delivery_data_and_variant_price(client: TestClient
                     "size": "M",
                     "color": "Negro",
                     "price_adjustment_cents": 500,
+                    "stock_quantity": 2,
                 }
             ],
         },

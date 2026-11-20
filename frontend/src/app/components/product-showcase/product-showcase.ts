@@ -2,7 +2,7 @@ import { CurrencyPipe } from '@angular/common';
 import { Component, computed, effect, ElementRef, input, model, output, signal, viewChild } from '@angular/core';
 import { ProductOptions } from '../product-options/product-options';
 import { ProductReviews } from '../product-reviews/product-reviews';
-import { Product, ProductVariant } from '../../models/product.model';
+import { availableQuantity, Product, ProductVariant } from '../../models/product.model';
 
 @Component({
   selector: 'app-product-showcase',
@@ -21,6 +21,7 @@ export class ProductShowcase {
   protected readonly previousProduct = computed(() => this.products()[this.index() - 1]);
   protected readonly nextProduct = computed(() => this.products()[this.index() + 1]);
   protected readonly selectedVariant = computed(() => this.product()?.variants.find((variant) => variant.id === this.variantId()) ?? null);
+  protected readonly available = computed(() => this.product() ? availableQuantity(this.product()!, this.selectedVariant()) : 0);
   protected readonly photoIndex = signal(0);
   protected readonly photoColor = computed(() => this.selectedVariant()?.color ?? this.product()?.variants[0]?.color ?? this.product()?.images?.[0]?.color ?? '');
   protected readonly cover = computed(() => {
@@ -130,7 +131,7 @@ export class ProductShowcase {
 
   protected addToOrder(): void {
     const product = this.product();
-    if (!product || (product.variants.length && !this.selectedVariant())) return;
+    if (!product || this.available() === 0 || (product.variants.length && !this.selectedVariant())) return;
     this.addProduct.emit({ product, variant: this.selectedVariant() });
   }
 

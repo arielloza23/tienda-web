@@ -23,7 +23,7 @@ def order_payload(pid, expected=None):
 
 
 def test_price_changed_rejects_without_order_then_confirms_and_replays(client, db_session):
-    product = client.post("/api/v1/products", json={"name": "Prueba", "slug": "prueba", "price_cents": 1500}).json()
+    product = client.post("/api/v1/products", json={"name": "Prueba", "slug": "prueba", "price_cents": 1500, "stock_quantity": 2}).json()
     body = order_payload(product["id"], 1000)
     key = {"Idempotency-Key": str(uuid4())}
     response = client.post("/api/v1/orders", json=body, headers=key)
@@ -249,7 +249,7 @@ def test_concurrent_status_updates_cannot_overwrite_each_other(tmp_path, monkeyp
                 return ("conflict", status)
     try:
         with ThreadPoolExecutor(max_workers=2) as executor:
-            results = list(executor.map(change, ["paid", "cancelled"]))
+            results = list(executor.map(change, ["reserved", "cancelled"]))
         assert sum(result[0] == "ok" for result in results) == 1
         assert sum(result[0] == "conflict" for result in results) == 1
         with Session(engine) as db:

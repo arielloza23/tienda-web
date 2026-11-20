@@ -28,15 +28,24 @@ describe('Administrative order flow', () => {
     component['changeStatus']('paid'); expect(api.updateStatus).toHaveBeenCalledTimes(1);
   });
   it('clears contact details on session expiry and does not render them for a logged-out user', async () => {
-    const { component, response, auth, fixture } = await setup(); component['select'](12); component['changeStatus']('paid');
+    const { component, response, auth, fixture } = await setup(); component['select'](12); component['changeStatus']('reserved');
     response.error(new HttpErrorResponse({ status: 401 })); fixture.detectChanges();
     expect(auth.logout).toHaveBeenCalled(); expect(component['orders']()).toEqual([]); expect(component['selected']()).toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain(order.customer_phone);
   });
   it('filters orders locally and preserves contact details when an update fails', async () => {
     const { component, response } = await setup(); component['filter'].set('paid'); expect(component['filtered']()).toEqual([]);
-    component['filter'].set(''); component['select'](12); component['changeStatus']('paid');
+    component['filter'].set(''); component['select'](12); component['changeStatus']('reserved');
     response.error(new HttpErrorResponse({ status: 409, error: { detail: 'El pedido cambió. Actualiza la lista.' } }));
     expect(component['selected']()?.status).toBe('pending'); expect(component['error']()).toContain('Actualiza'); expect(component['busy']()).toBe(false);
   });
+  it('requires reservation before payment and exposes stock errors without losing the selected order', async () => {
+    const { component, api, response } = await setup(); component['select'](12);
+    component['changeStatus']('paid'); expect(api.updateStatus).not.toHaveBeenCalled();
+    component['changeStatus']('reserved'); expect(api.updateStatus).toHaveBeenCalledWith(12, 'reserved');
+    response.error(new HttpErrorResponse({ status: 409, error: { detail: { code: 'insufficient_stock', message: 'Stock insuficiente para talla M.' } } }));
+    expect(component['error']()).toBe('Stock insuficiente para talla M.');
+    expect(component['selected']()?.status).toBe('pending'); expect(api.list).toHaveBeenCalledTimes(2);
+  });
+
 });

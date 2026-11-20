@@ -7,7 +7,7 @@ import { RouterLink } from '@angular/router';
 import type { DeliveryLocation } from './components/delivery-map/delivery-map';
 import { DeliveryMap } from './components/delivery-map/delivery-map';
 import { ProductShowcase } from './components/product-showcase/product-showcase';
-import { CartItem, Product, ProductVariant } from './models/product.model';
+import { availableQuantity, CartItem, Product, ProductVariant } from './models/product.model';
 import { OrderCreateRequest } from './models/order.model';
 import { CartService } from './services/cart.service';
 import { OrderReceiptService, SavedReceipt } from './services/order-receipt.service';
@@ -39,24 +39,31 @@ export class Storefront implements OnInit {
     'https://images.pexels.com/photos/33114806/pexels-photo-33114806.jpeg?auto=compress&cs=tinysrgb&w=900';
 
   protected readonly products = signal<Product[]>([]);
+  // Keep the full catalog for cart reconciliation; only offer available sizes in the store.
+  protected readonly availableProducts = computed(() => this.products().flatMap(product => {
+    if (!product.is_active) return [];
+    if (!product.variants.length) return availableQuantity(product) > 0 ? [product] : [];
+    const variants = product.variants.filter(variant => availableQuantity(product, variant) > 0);
+    return variants.length ? [{ ...product, variants }] : [];
+  }));
   protected readonly activeColor = signal('Todos');
   protected readonly featuredProductId = signal<number | null>(null);
   protected readonly cartOpen = signal(false);
   private readonly cartDialog = viewChild.required<ElementRef<HTMLDialogElement>>('cartDialog');
   protected readonly cartFeedback = signal('');
   protected readonly availableColors = computed(() => ['Todos', ...new Set(
-    this.products().flatMap((product) => product.variants.map((variant) => variant.color?.trim()).filter((color): color is string => !!color)),
+    this.availableProducts().flatMap((product) => product.variants.map((variant) => variant.color?.trim()).filter((color): color is string => !!color)),
   )]);
   protected readonly activeSize = signal('Todas');
   protected readonly maximumPrice = signal<number | null>(null);
   protected readonly catalogSort = signal('featured');
   protected readonly availableSizes = computed(() => ['Todas', ...new Set(
-    this.products().flatMap(product => product.variants.map(variant => variant.size?.trim()).filter((size): size is string => !!size)),
+    this.availableProducts().flatMap(product => product.variants.map(variant => variant.size?.trim()).filter((size): size is string => !!size)),
   )]);
   protected readonly hasCatalogFilters = computed(() => this.activeColor() !== 'Todos'
     || this.activeSize() !== 'Todas' || this.maximumPrice() !== null);
   protected readonly visibleProducts = computed(() => {
-    const products = this.products().filter(product => this.matchingPrices(product).length > 0);
+    const products = this.availableProducts().filter(product => this.matchingPrices(product).length > 0);
     const direction = this.catalogSort() === 'price-asc' ? 1 : this.catalogSort() === 'price-desc' ? -1 : 0;
     return direction ? products.sort((a, b) => direction * (this.catalogPrice(a) - this.catalogPrice(b))) : products;
   });
@@ -195,6 +202,8 @@ export class Storefront implements OnInit {
     this.feedbackTimeout = setTimeout(() => this.cartFeedback.set(''), 3500);
   }
 
+  protected quantityLimit(item: CartItem): number { return availableQuantity(item.product, item.variant); }
+
   protected increaseQuantity(item: CartItem): void {
     if (!this.isSubmittingOrder()) this.cartService.add(item.product, item.variant);
   }
@@ -263,6 +272,9 @@ export class Storefront implements OnInit {
             return `${item ? this.cartItemDescription(item) : 'Producto'}: antes ${this.formatPrice(change.expected_unit_price_cents)}, ahora ${this.formatPrice(change.current_unit_price_cents)} por unidad.`;
           }));
           this.checkoutError.set('Los precios cambiaron. Actualizamos tu pedido; revisa los importes y vuelve a confirmar para aceptarlos.');
+          this.refreshOrderPrices();
+        } else if (error.status === 409 && error.error?.detail?.code === 'insufficient_stock') {
+          this.checkoutError.set(error.error.detail.message || 'La disponibilidad cambió. Revisa las cantidades antes de volver a confirmar.');
           this.refreshOrderPrices();
         } else this.checkoutError.set(this.checkoutErrorMessage(error));
         this.isSubmittingOrder.set(false);

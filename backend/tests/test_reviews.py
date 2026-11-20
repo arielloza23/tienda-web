@@ -17,7 +17,7 @@ from app.schemas.user import UserCreate
 
 @pytest.fixture
 def product(db_session):
-    item = Product(name="Vestido", slug="vestido-review", price_cents=1550, is_active=True)
+    item = Product(name="Vestido", slug="vestido-review", price_cents=1550, is_active=True, stock_quantity=2)
     db_session.add(item)
     db_session.commit()
     return item

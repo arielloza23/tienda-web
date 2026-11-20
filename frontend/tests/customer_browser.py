@@ -13,7 +13,6 @@ from PIL import Image
 from pydantic import SecretStr
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.core.config import settings
 from app.core.security import hash_password
@@ -27,7 +26,9 @@ from app.services import image_service
 from playwright.sync_api import sync_playwright, expect
 
 # Todos los datos y las fotos de esta prueba son temporales.
-engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+database_directory = tempfile.TemporaryDirectory(prefix="customer-browser-", dir=Path.cwd() / ".pytest_cache")
+database_path = Path(database_directory.name) / "browser.db"
+engine = create_engine(f"sqlite:///{database_path.as_posix()}", connect_args={"check_same_thread": False})
 Base.metadata.create_all(engine)
 sessions = sessionmaker(bind=engine)
 with sessions() as db:
@@ -203,3 +204,5 @@ finally:
     server.should_exit = True; static.shutdown(); static.server_close()
     for thread in threads: thread.join(timeout=10)
     engine.dispose()
+    assert Path(database_directory.name).resolve().is_relative_to((Path.cwd() / ".pytest_cache").resolve())
+    database_directory.cleanup()

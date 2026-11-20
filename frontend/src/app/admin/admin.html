@@ -20,7 +20,7 @@
   } @else {
     <p class="signed-in">Sesión de <strong>{{ auth.user()?.full_name || auth.user()?.email }}</strong></p>
     <nav class="admin-sections" aria-label="Secciones de administración">
-      <button type="button" class="button secondary" [attr.aria-pressed]="section() === 'products'" (click)="section.set('products')">Productos</button>
+      <button type="button" class="button secondary" [attr.aria-pressed]="section() === 'products'" (click)="section.set('products'); loadProducts()">Productos</button>
       <button type="button" class="button secondary" [attr.aria-pressed]="section() === 'orders'" (click)="section.set('orders')">Pedidos</button>
     </nav>
     @if (section() === 'orders') { <app-admin-orders /> }
@@ -39,6 +39,10 @@
               <div><label for="product-price">Precio base (USD)</label><input id="product-price" name="productPrice" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" [(ngModel)]="draft.price" required aria-describedby="price-help"><small id="price-help">Desde 0, con un máximo de dos decimales. Ej.: 15,50.</small></div>
               <label class="checkbox"><input name="productActive" type="checkbox" [(ngModel)]="draft.is_active"> Publicar como producto activo</label>
             </div>
+            @if (editingId() === null && !draft.variants.length) {
+              <label for="initial-stock">Stock inicial disponible</label><input id="initial-stock" name="initialStock" type="number" min="0" max="2147483647" step="1" [(ngModel)]="draft.stock_quantity" required>
+            }
+            @if (editingId() !== null) { <p class="muted">El stock se guarda por separado en la lista de productos. Guardar este formulario no cambia las existencias actuales.</p> }
             <section class="form-section" aria-labelledby="cover-title">
               <h3 id="cover-title">Foto de portada</h3><label for="cover-file">Seleccionar una foto del equipo</label>
               <input id="cover-file" name="coverFile" type="file" accept="image/jpeg,image/png,image/webp,image/avif" (change)="uploadCover($event)" aria-describedby="photo-help">
@@ -56,6 +60,9 @@
                     <div><label [for]="'color-' + i">Color</label><input [id]="'color-' + i" [name]="'color-' + i" [(ngModel)]="variant.color" maxlength="50"></div>
                     <div><label [for]="'adjustment-' + i">Importe adicional (USD)</label><input [id]="'adjustment-' + i" [name]="'adjustment-' + i" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" [(ngModel)]="variant.adjustment" required></div>
                   </div>
+                  @if (variant.id === undefined) {
+                    <label [for]="'initial-stock-' + i">Stock inicial disponible</label><input [id]="'initial-stock-' + i" [name]="'initial-stock-' + i" type="number" min="0" max="2147483647" step="1" [(ngModel)]="variant.stock_quantity" required>
+                  }
                   <p class="muted measurement-heading">Contorno de la prenda en cm · Opcional</p>
                   <div class="fields measurement-fields">
                     @for (measure of measurementFields; track measure.key) {
@@ -91,11 +98,30 @@
       </section>
       <section class="panel catalog-panel" aria-labelledby="catalog-title" [attr.aria-busy]="loadingProducts()">
         <div class="section-heading"><div><p class="eyebrow">Tu colección</p><h2 id="catalog-title">Productos</h2></div><button type="button" class="button secondary" (click)="loadProducts()" [disabled]="busy()">Actualizar</button></div>
+        <p class="muted">Stock disponible por talla y color. Los pedidos pendientes no apartan unidades; se descuentan al reservarlos.</p>
+        @if (stockError()) { <p role="alert" class="notice error">{{ stockError() }}</p> }
+        @if (stockSuccess()) { <p role="status" class="notice success">{{ stockSuccess() }}</p> }
+        @if (stockEditor(); as editor) {
+          <form class="item-card" ngNativeValidate (ngSubmit)="saveStock()" aria-label="Ajustar stock disponible">
+            <p><strong>{{ editor.label }}</strong></p>
+            <label for="stock-quantity">Nuevo stock disponible (actual: {{ editor.expected }})</label>
+            <input id="stock-quantity" name="stockQuantity" type="number" min="0" max="2147483647" step="1" [(ngModel)]="stockInput" [disabled]="busy()" required>
+            <button class="button primary" type="submit" [disabled]="busy()">{{ savingStock() ? 'Guardando stock…' : 'Guardar stock' }}</button>
+            <button class="button secondary" type="button" (click)="stockEditor.set(null)" [disabled]="busy()">Cancelar ajuste</button>
+          </form>
+        }
         @if (loadingProducts()) { <p class="empty" role="status">Cargando productos…</p> } @else {
           <ul class="product-list">@for (product of products(); track product.id) {
             <li class="product-row">
               @if (product.image_url) { <img [src]="product.image_url" [alt]="product.name" loading="lazy"> } @else { <div class="image-placeholder" aria-hidden="true">Sin foto</div> }
-              <div class="product-info"><h3>{{ product.name }}</h3><p>{{ product.price_cents / 100 | currency:'USD':'symbol':'1.2-2' }}</p><span class="badge" [class.active]="product.is_active">{{ product.is_active ? 'Activo' : 'Borrador' }}</span></div>
+              <div class="product-info"><h3>{{ product.name }}</h3>
+                <p>Stock total disponible: {{ product.stock_quantity ?? 'Sin cargar' }}</p>
+                @for (variant of product.variants; track variant.id) {
+                  <div class="stock-row"><span>{{ variant.size || 'Sin talla' }} · {{ variant.color || variant.sku }}: {{ variant.stock_quantity ?? 'Sin cargar' }}</span>
+                    <button class="text-button" type="button" (click)="openStock(product, variant.id)" [disabled]="busy()" [attr.aria-label]="'Ajustar stock de ' + product.name + ', ' + (variant.size || variant.sku) + ', ' + (variant.color || '')">Ajustar stock</button>
+                  </div>
+                } @empty { <button class="text-button" type="button" (click)="openStock(product, null)" [disabled]="busy()" [attr.aria-label]="'Ajustar stock de ' + product.name">Ajustar stock</button> }
+<p>{{ product.price_cents / 100 | currency:'USD':'symbol':'1.2-2' }}</p><span class="badge" [class.active]="product.is_active">{{ product.is_active ? 'Activo' : 'Borrador' }}</span></div>
               <button type="button" class="button secondary" (click)="editProduct(product)" [disabled]="busy()" [attr.aria-pressed]="editingId() === product.id">Editar</button>
             </li>
           } @empty { <li class="empty">Todavía no hay productos. Crea el primero con el formulario.</li> }</ul>
